@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_linxo_account_user,linxo.account user,model_linxo_account,base.group_tool_user,1,1,1,1
+access_linxo_transaction_user,linxo.transaction user,model_linxo_transaction,base.group_tool_user,1,1,1,1

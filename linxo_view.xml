@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<openerp>
+    <data>
+        <!-- Top menu item -->
+        <menuitem name="Tools" id="base.menu_tools" sequence="120" groups="base.group_tool_user"/>
+
+
+        <!-- Accounts Search View-->
+        <record model="ir.ui.view" id="view_linxo_account_search">
+            <field name="name">linxo.account.search</field>
+            <field name="model">linxo.account</field>
+            <field name="arch" type="xml">
+                <search string="Linxo Bank Accounts">
+                    <field name="name" string="Accounts"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- Account Form View -->
+        <record model="ir.ui.view" id="view_linxo_account_form">
+            <field name="name">linxo.account.form</field>
+            <field name="model">linxo.account</field>
+            <field name="arch" type="xml">
+                <form string="Linxo Bank Account" version="7.0">
+                    <group>
+                        <field name="name"/>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <!-- Account Tree View -->
+        <record model="ir.ui.view" id="view_linxo_account_tree">
+            <field name="name">linxo.account.tree</field>
+            <field name="model">linxo.account</field>
+            <field name="field_parent"></field>
+            <field name="arch" type="xml">
+                <tree string="Linxo Bank Account">
+                    <field name="name"/>
+                </tree>
+            </field>
+        </record>
+
+        <!-- Account Action -->
+        <record model="ir.actions.act_window" id="action_linxo_account">
+            <field name="name">Accounts</field>
+            <field name="res_model">linxo.account</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">tree,form</field>
+            <field name="search_view_id" ref="view_linxo_account_search"/>
+        </record>
+
+        <menuitem name="Linxo" parent="base.menu_tools" id="base.menu_linxo_root" sequence="10" />
+        <menuitem name="Bank Accounts" parent="base.menu_linxo_root" id="menu_linxo_accounts" action="action_linxo_account" />
+
+
+        <!-- Transaction Search View-->
+        <record model="ir.ui.view" id="view_linxo_transaction_search">
+            <field name="name">linxo.transaction.search</field>
+            <field name="model">linxo.transaction</field>
+            <field name="arch" type="xml">
+                <search string="Linxo Transactions">
+                    <field name="label" string="Transactions"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- Transaction Form View -->
+        <record model="ir.ui.view" id="view_linxo_transaction_form">
+            <field name="name">linxo.transaction.form</field>
+            <field name="model">linxo.transaction</field>
+            <field name="arch" type="xml">
+                <form string="Transaction" version="7.0">
+                    <group>
+                        <field name="label"/>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <!-- Transactions Action -->
+        <record model="ir.actions.act_window" id="action_linxo_transaction">
+            <field name="name">Transactions</field>
+            <field name="res_model">linxo.transaction</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">form</field>
+            <field name="search_view_id" ref="view_linxo_transaction_search"/>
+        </record>
+
+        <menuitem name="Transactions" parent="base.menu_linxo_root" id="menu_linxo_transaction" action="action_linxo_transaction" />
+
+
+    </data>
+</openerp>
