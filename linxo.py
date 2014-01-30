@@ -5,9 +5,16 @@ from openerp.osv import fields
 from openerp.tools.translate import _
 import time
 
-#VoteValues = [('-1', 'Not Voted'), ('0', 'Very Bad'), ('25', 'Bad'), \
-#              ('50', 'Normal'), ('75', 'Good'), ('100', 'Very Good') ]
-#DefaultVoteValue = '50'
+class linxo_config_settings(osv.osv_memory):
+
+    _name = 'linxo.config.settings'
+    _inherit = 'res.config.settings'
+    _columns = {
+        'username': fields.char('Username (email address)', size=48),
+        'password': fields.char('Password', size=48),
+        'api_key': fields.char('Linxo API Key', size=48),
+        'api_secret': fields.char('Linxo API Secret', size=60),
+    }
 
 class linxo_account(osv.osv):
     """ Bank Account stored on Linxo """
@@ -15,6 +22,7 @@ class linxo_account(osv.osv):
     _description = "Linxo Bank Account"
     _columns = {
         'name': fields.char('Account Name', size=120, required=True),
+        'journal_id': fields.many2one('account.journal', 'OpenERP Journal Id', ondelete='cascade'),
         'account_group_name': fields.char('Account Group Name', size=30, required=True),
         'account_number': fields.char('Account Number', size=30, required=True),
         'type': fields.char('Account Type', size=30, required=True),
