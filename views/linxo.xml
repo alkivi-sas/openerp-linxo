@@ -112,7 +112,7 @@
             <field name="name">linxo.sync.form</field>
             <field name="model">linxo.sync</field>
             <field name="arch" type="xml">
-                <form string="Manual Sync" version="7.0" create="false" editable="false">
+                <form string="Manual Sync" version="7.0" create="false" class="oe_form_configuration">
                     <group colspan="4" col="2">
                         <field name='account_treated' readonly="1"/>
                         <field name='account_updated' readonly="1"/>
@@ -120,7 +120,7 @@
                         <field name='transaction_treated' readonly="1"/>
                         <field name='transaction_updated' readonly="1"/>
                         <field name='transaction_created' readonly="1"/>
-                        <button name="do_sync" string="Launch manual sync" type="object"/>
+                        <button name="do_sync" string="Launch manual sync" type="object" class="oe_highlight"/>
                     </group>
                 </form>
             </field>
