@@ -11,21 +11,10 @@
             <field name="model">linxo.account</field>
             <field name="arch" type="xml">
                 <search string="Linxo Bank Accounts">
-                    <field name="name" string="Accounts"/>
+                    <field name="name" string="Account Name"/>
+                    <field name="account_number" string="Account Number"/>
+                    <field name="account_group_name" string="Account Group Name"/>
                 </search>
-            </field>
-        </record>
-
-        <!-- Account Form View -->
-        <record model="ir.ui.view" id="view_linxo_account_form">
-            <field name="name">linxo.account.form</field>
-            <field name="model">linxo.account</field>
-            <field name="arch" type="xml">
-                <form string="Linxo Bank Account" version="7.0">
-                    <group>
-                        <field name="name"/>
-                    </group>
-                </form>
             </field>
         </record>
 
@@ -33,20 +22,25 @@
         <record model="ir.ui.view" id="view_linxo_account_tree">
             <field name="name">linxo.account.tree</field>
             <field name="model">linxo.account</field>
-            <field name="field_parent"></field>
+            <field name="type">tree</field>
             <field name="arch" type="xml">
-                <tree string="Linxo Bank Account">
-                    <field name="name"/>
+                <tree string="Linxo Bank Accounts" editable="bottom">
+                    <field name="name" readonly="1" />
+                    <field name="account_group_name" readonly="1" />
+                    <field name="linxo_id" invisible="True" />
+                    <field name="journal_id" />
+                    <field name="account_number" readonly="1" />
+                    <field name="type" invisible="True" />
                 </tree>
             </field>
         </record>
 
         <!-- Account Action -->
         <record model="ir.actions.act_window" id="action_linxo_account">
-            <field name="name">Accounts</field>
+            <field name="name">Linxo Bank Accounts</field>
             <field name="res_model">linxo.account</field>
             <field name="view_type">form</field>
-            <field name="view_mode">tree,form</field>
+            <field name="view_mode">tree</field>
             <field name="search_view_id" ref="view_linxo_account_search"/>
         </record>
 
@@ -60,8 +54,27 @@
             <field name="model">linxo.transaction</field>
             <field name="arch" type="xml">
                 <search string="Linxo Transactions">
-                    <field name="label" string="Transactions"/>
+                    <field name="label" string="Label"/>
+                    <field name="notes" string="Extra Notes"/>
+                    <field name="amount" string="Amount"/>
+                    <field name="date" string="Date"/>
                 </search>
+            </field>
+        </record>
+
+        <!-- Transaction Tree View -->
+        <record model="ir.ui.view" id="view_linxo_transaction_tree">
+            <field name="name">linxo.transaction.tree</field>
+            <field name="model">linxo.transaction</field>
+            <field name="type">tree</field>
+            <field name="arch" type="xml">
+                <tree string="Linxo Transactions" create="false">
+                    <field name="date" readonly="1" />
+                    <field name="label" readonly="1" />
+                    <field name="amount" readonly="1" />
+                    <field name="account_move_line_id"/>
+                    <field name="notes" readonly="1" />
+                </tree>
             </field>
         </record>
 
@@ -69,10 +82,16 @@
         <record model="ir.ui.view" id="view_linxo_transaction_form">
             <field name="name">linxo.transaction.form</field>
             <field name="model">linxo.transaction</field>
+            <field name="type">form</field>
             <field name="arch" type="xml">
-                <form string="Transaction" version="7.0">
-                    <group>
-                        <field name="label"/>
+                <form string="Transaction Info">
+                    <group colspan="4" col="2">
+                        <field name="date" readonly="1"/>
+                        <field name="label" readonly="1"/>
+                        <field name="notes" readonly="1"/>
+                        <field name="amount" readonly="1"/>
+                        <field name="account_move_line_id" domain="[('journal_id','=',journal_id),'|', ('debit','=', abs(amount)), ('credit','=', abs(amount))]"/>
+                        <field name="journal_id" readonly="1"/>
                     </group>
                 </form>
             </field>
@@ -83,12 +102,37 @@
             <field name="name">Transactions</field>
             <field name="res_model">linxo.transaction</field>
             <field name="view_type">form</field>
-            <field name="view_mode">form</field>
+            <field name="view_mode">tree,form</field>
             <field name="search_view_id" ref="view_linxo_transaction_search"/>
         </record>
-
         <menuitem name="Transactions" parent="base.menu_linxo_root" id="menu_linxo_transaction" action="action_linxo_transaction" />
 
+        <!-- Sync Form View -->
+        <record model="ir.ui.view" id="view_linxo_sync_form">
+            <field name="name">linxo.sync.form</field>
+            <field name="model">linxo.sync</field>
+            <field name="arch" type="xml">
+                <form string="Manual Sync" version="7.0" create="false" editable="false">
+                    <group colspan="4" col="2">
+                        <field name='account_treated' readonly="1"/>
+                        <field name='account_updated' readonly="1"/>
+                        <field name='account_created' readonly="1"/>
+                        <field name='transaction_treated' readonly="1"/>
+                        <field name='transaction_updated' readonly="1"/>
+                        <field name='transaction_created' readonly="1"/>
+                        <button name="do_sync" string="Launch manual sync" type="object"/>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <!-- Account Action -->
+        <record model="ir.actions.act_window" id="action_linxo_sync">
+            <field name="name">Sync</field>
+            <field name="res_model">linxo.sync</field>
+            <field name="view_mode">form</field>
+        </record>
+        <menuitem name="Manual Sync" parent="base.menu_linxo_root" id="menu_linxo_sync" action="action_linxo_sync" />
 
     </data>
 </openerp>

@@ -12,6 +12,7 @@ from openerp.osv import osv
 from openerp.osv import fields
 from openerp.tools.translate import _
 from openerp.addons import account
+import openerp.addons.decimal_precision as dp
 
 _logger = logging.getLogger(__name__)
 
@@ -106,7 +107,6 @@ class linxo_sync(osv.osv_memory):
 
     def do_sync(self, cr, uid, ids, context=None):
         """Perform sync with openerp server"""
-        _logger.warning('Going to SYNC !')
 
         # Move this to overrided __init__ ?
         self.base_domain = 'partners.linxo.com'
@@ -184,6 +184,12 @@ class linxo_sync(osv.osv_memory):
                     elif result == 2:
                         self.transaction_updated += 1
                     self.transaction_treated += 1
+
+        data = {}
+        for key in self._defaults:
+            data[key] = getattr(self, key)
+
+        self.pool.get('linxo.sync').write(cr, uid, ids, data, context=context)
         return self
 
     def _need_to_fetch_more(self, cr, uid, ids, context,  transactions, counter, num_rows):
@@ -590,6 +596,35 @@ linxo_account()
 
 class linxo_transaction(osv.osv):
     """ Bank Transaction stored on Linxo """
+
+    def _get_candidates(self, cr, uid, ids, field_name, arg, context):
+        """Will return a list of ids according to the match
+        """
+        result = {}
+        transactions = self.pool.get('linxo.transaction').browse(cr, uid, ids, context=context)
+
+        for transaction in transactions:
+
+            search_args = [
+                '|', ('date', '=', transaction.date), ('date', '=', transaction.budget_date),
+                ('journal_id', '=', transaction.journal_id),
+            ]
+
+            if transaction.amount > 0:
+                search_args.append(('debit', '=', transaction.amount))
+            else:
+                search_args.append(('credit', '=', -transaction.amount))
+
+            account_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
+
+            if account_ids:
+                result[transaction.id] = account_ids
+            else:
+                #res[i] must be set to False and not to None because of XML:RPC
+                # "cannot marshal None unless allow_none is enabled"
+                result[transaction.id] = False
+        return result
+
     _name = 'linxo.transaction'
     _columns = {
         'linxo_id' : fields.integer('Linxo Transaction ID', required=True),
@@ -597,7 +632,7 @@ class linxo_transaction(osv.osv):
             'linxo.account', 'Linxo Account', ondelete='cascade'),
         'account_move_line_id': fields.many2one(
             'account.move.line', 'Account Move Line'),
-        'amount': fields.float('Amount',digits=(12,3), required=True),
+        'amount': fields.float('Amount', digits_compute=dp.get_precision('Account'), required=True),
         'budget_date': fields.date('Budget Date', required=True),
         'date': fields.date('Date', required=True),
         'category' : fields.integer('Category'),
@@ -610,6 +645,12 @@ class linxo_transaction(osv.osv):
             'account_id', 'journal_id', type="many2one",
             relation="account.journal", string="Bank Journal",
             store=False),
+        'candidates': fields.function(
+            _get_candidates,
+            type='one2many',
+            obj="account.move.line",
+            method=True,
+            string='Possible candidates'),
     }
 
     _sql_constraints = [
@@ -618,5 +659,6 @@ class linxo_transaction(osv.osv):
 
     _rec_name = 'label'
     _order = 'date desc'
+
 
 linxo_transaction()

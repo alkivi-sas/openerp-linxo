@@ -1,30 +1,29 @@
 # -*- coding: utf-8 -*-
 { 
    'name': 'Linxo', 
-   'version': '0.1', 
-   'summary': 'Bank reconciliation via Linxo',
+   'version': '0.7.8', 
+   'summary': 'Bank reconciliation using Linxo',
    'description': """
 Import bank statement from Linxo and perform automatic reconciliation.
 ======================================================================
 
-Linxo (www.linxo.com) is a tools to agregate several bank accounts 
+Linxo (www.linxo.com) is a tool that agregate several bank accounts 
 into one interface.
 
-We use the API provided by Linxo to fetch latest bank transaction
-and then apply reconciliation where it's possible
+We use their API to fetch latest bank transactions
+and then apply reconciliation whenever it's possible.
 
-Futur : code a guesser for unknow transaction""",
+Manual reconciliation is also possible when automatic
+guess failed.""",
    'category': 'Accounting & Finance', 
-   'author': 'Alkivi SAS', 
-   'website': 'http://www.alkivi.fr',
-   'depends': ['base'],
+   'author': 'Alkivi (alkivi.fr)',
+   'website': 'http://www.linxo.com',
+   'depends' : ['base', 'account'],
    'data': [ 
-        'security/linxo_security.xml',
-        'security/ir.model.access.csv',
-        'views/linxo.xml',
-        'views/config.xml',
+       'security/ir.model.access.csv',
+       'views/linxo.xml',
+       'views/config.xml',
    ], 
-   'test': [],
    'installable': True,
-   'images': [],
+   'application': True,
 } 
