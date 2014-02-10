@@ -12,22 +12,12 @@
                         <button string="Cancel" type="object" name="cancel" class="oe_link"/>
                     </header>
                     <separator string="Global Linxo Settings"/>
-                    <div>
-                        <label for="username" width="200px"/>
-                        <field name="username" class="oe_inline"/>
-                    </div>
-                    <div>
-                        <label for="password" width="200px"/>
-                        <field name="password" class="oe_inline" password="True"/>
-                    </div>
-                    <div>
-                        <label for="api_key" width="200px"/>
-                        <field name="api_key" class="oe_inline"/>
-                    </div>
-                    <div>
-                        <label for="api_secret" width="200px"/>
-                        <field name="api_secret" class="oe_inline" password="True"/>
-                    </div>
+                    <group colspan="2" col="2">
+                        <field name="username" />
+                        <field name="password" password="True"/>
+                        <field name="api_key" />
+                        <field name="api_secret" password="True"/>
+                    </group>
                 </form>
             </field>
         </record>

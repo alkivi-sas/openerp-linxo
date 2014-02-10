@@ -432,6 +432,7 @@ class linxo_sync(osv.osv_memory):
                 'password' : self.password,
             },
         }
+        _logger.debug('Going to log using %s %s' % (self.username, self.password))
 
         self._perform_query(payload)
         self.logged_in = True
@@ -489,10 +490,6 @@ class linxo_sync(osv.osv_memory):
         if 'secret' not in payload['action']:
             payload['action']['secret'] = self.session.cookies['LinxoSession']
 
-        # Debug only if not doing login (we dont want clear password in logs)
-        if payload['actionName'] != 'com.linxo.gwt.rpc.client.auth.LoginAction':
-            _logger.debug('LINXO sending', payload)
-
         result = self.session.post(self.url, 
                                    data=json.dumps(payload), 
                                    verify=self.verify_ssl)
@@ -502,7 +499,18 @@ class linxo_sync(osv.osv_memory):
 
         # Result are check according to functions called
         json_response = json.loads(raw_json)
-        if json_response['resultName'] == 'com.linxo.gwt.server.support.json.ErrorResult':
+
+        if payload['actionName'] == 'com.linxo.gwt.rpc.client.auth.LoginAction':
+            # Special treatment for login:
+            if 'result' not in json_response:
+                raise osv.except_osv(_("Error!"), _("Weird loggin error ..."))
+            elif 'userId' not in json_response['result']:
+                blocked = json_response['result']['blocked']
+                if blocked:
+                    raise osv.except_osv(_("Error!"), _("Too much login tentative, you are now blocked."))
+                else:
+                    raise osv.except_osv(_("Warning"), _("Unable to login : wrong credentials."))
+        elif json_response['resultName'] == 'com.linxo.gwt.server.support.json.ErrorResult':
             raise APIError(json_response['result'])
 
         return json_response['result']
@@ -596,35 +604,6 @@ linxo_account()
 
 class linxo_transaction(osv.osv):
     """ Bank Transaction stored on Linxo """
-
-    def _get_candidates(self, cr, uid, ids, field_name, arg, context):
-        """Will return a list of ids according to the match
-        """
-        result = {}
-        transactions = self.pool.get('linxo.transaction').browse(cr, uid, ids, context=context)
-
-        for transaction in transactions:
-
-            search_args = [
-                '|', ('date', '=', transaction.date), ('date', '=', transaction.budget_date),
-                ('journal_id', '=', transaction.journal_id),
-            ]
-
-            if transaction.amount > 0:
-                search_args.append(('debit', '=', transaction.amount))
-            else:
-                search_args.append(('credit', '=', -transaction.amount))
-
-            account_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
-
-            if account_ids:
-                result[transaction.id] = account_ids
-            else:
-                #res[i] must be set to False and not to None because of XML:RPC
-                # "cannot marshal None unless allow_none is enabled"
-                result[transaction.id] = False
-        return result
-
     _name = 'linxo.transaction'
     _columns = {
         'linxo_id' : fields.integer('Linxo Transaction ID', required=True),
@@ -645,12 +624,6 @@ class linxo_transaction(osv.osv):
             'account_id', 'journal_id', type="many2one",
             relation="account.journal", string="Bank Journal",
             store=False),
-        'candidates': fields.function(
-            _get_candidates,
-            type='one2many',
-            obj="account.move.line",
-            method=True,
-            string='Possible candidates'),
     }
 
     _sql_constraints = [
