@@ -75,9 +75,39 @@
                     <field name="date" readonly="1" />
                     <field name="label" readonly="1" />
                     <field name="amount" readonly="1" />
-                    <field name="account_move_line_id" domain="[('journal_id','=',journal_id),('date','=',date)]" context="'default_search_journal_id':self.journal_id, 'default_search_date':self.date" />
+                    <field name="account_move_line_id" />
                     <field name="notes" readonly="1" />
                 </tree>
+            </field>
+        </record>
+
+        <!-- Transaction Tree View -->
+        <record model="ir.ui.view" id="view_linxo_moves_tree">
+            <field name="name">linxo.moves.tree</field>
+            <field name="model">account.move.line</field>
+            <field eval="8" name="priority"/>
+            <field name="type">tree</field>
+            <field name="arch" type="xml">
+                <tree string="Matching Moves" create="false">
+                    <field name="date" readonly="1" />
+                    <field name="debit" readonly="1" />
+                    <field name="credit" readonly="1" />
+                    <field name="state" readonly="1" />
+                    <field name="partner_id" readonly="1" />
+                </tree>
+            </field>
+        </record>
+
+        <!-- Search View for account move line -->
+        <record model="ir.ui.view" id="view_linxo_moves_search">
+            <field name="name">linxo.moves.search</field>
+            <field name="model">account.move.line</field>
+            <field name="arch" type="xml">
+                <search string="Matching Moves">
+                    <field name="credit" string="Crédit"/>
+                    <field name="debit" string="Débit"/>
+                    <field name="date" string="Date"/>
+                </search>
             </field>
         </record>
 
@@ -93,7 +123,7 @@
                         <field name="label" readonly="1"/>
                         <field name="notes" readonly="1"/>
                         <field name="amount" readonly="1"/>
-                        <field name="account_move_line_id" />
+                        <field name="account_move_line_id" context="{'transaction_id': active_id}"/>
                         <field name="journal_id" readonly="1"/>
                     </group>
                 </form>
@@ -139,6 +169,7 @@
             <field name="view_mode">form</field>
         </record>
         <menuitem name="Manual Sync" parent="base.menu_linxo_root" id="menu_linxo_sync" action="action_linxo_sync" />
+
 
     </data>
 </openerp>

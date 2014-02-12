@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from lxml import etree
 import logging
 import time
 import json
@@ -633,5 +634,46 @@ class linxo_transaction(osv.osv):
     _rec_name = 'label'
     _order = 'date desc'
 
+    def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):
+        #if (not view_id) and (view_type=='form') and context and context.get('force_email', False):
+        #    view_id = self.pool.get('ir.model.data').get_object_reference(cr, user, 'base', 'view_partner_simple_form')[1]
+        #res = super(res_partner,self).fields_view_get(cr, user, view_id, view_type, context, toolbar=toolbar, submenu=submenu)
 
-linxo_transaction()
+        #if view_type == 'form':
+        #    res['arch'] = self.fields_view_get_address(cr, user, res['arch'], context=context)
+
+        res = super(linxo_transaction, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar, submenu=submenu)
+
+        # Only on form view
+        if view_type == 'form':
+            for key in context:
+                _logger.debug('context key %s value %s' % (key,context[key]))
+
+            transaction = self.browse(cr, SUPERUSER_ID, uid, context=context)
+
+            eview = etree.XML(res['arch'])
+            for node in eview.xpath("//field[@name='account_move_line_id']"):
+                extra_context = "{'tree_view_ref': 'linxo.view_linxo_moves_tree', 'search_view_ref': 'linxo.view_linxo_moves_search'}"
+                #if transaction.amount > 0:
+                    #domain =  "[('credit', '=',%f )]" % abs(transaction.amount)
+                    #extra_context = extra_context + " 'search_default_credit':%f }" % abs(transaction.amount)
+                #else:
+                    #domain =  "[('debit', '=',%f )]" % abs(transaction.amount)
+                    #extra_context = extra_context + " 'search_default_debit':%f }" % abs(transaction.amount)
+                #node.set('domain', domain)
+                node.set('context', extra_context)
+            res['arch'] = etree.tostring(eview)
+
+            _logger.debug('final res')
+            _logger.debug(res['arch'])
+        return res
+
+    # on change account_move_line_id
+    #def on_change_account_move_line_id():
+
+    # Mark those account_move_line as marked
+    # Check associated account_move : if ok, mark ok
+    # Check assoaciated invoices : if ok, mark paid
+
+
+()
