@@ -5,6 +5,7 @@ import logging
 import time
 import json
 import re
+import datetime
 import requests
 
 from openerp import pooler, tools
@@ -105,13 +106,22 @@ class linxo_sync(osv.osv_memory):
     }
 
 
+    def do_reconciliation(self, cr, uid, ids, context=None):
+        transaction_obj = self.pool.get('linxo.transaction')
+        search_args = [('account_move_line_id', '=', None)]
+        transactions_ids = transaction_obj.search(cr, uid, search_args, context=context)
+        if transactions_ids:
+            transaction_obj.search_reconciliation(cr, uid, transactions_ids, context=context)
+            return True
+        else:
+            return False
 
     def do_sync(self, cr, uid, ids, context=None):
         """Perform sync with openerp server"""
 
         # Move this to overrided __init__ ?
-        self.base_domain = 'partners.linxo.com'
-        self.verify_ssl = False
+        self.base_domain = 'wwws.linxo.com'
+        self.verify_ssl = True
 
         self.url = 'https://%s/json' % self.base_domain
         self.logged_in = False
@@ -152,6 +162,10 @@ class linxo_sync(osv.osv_memory):
                 elif result == 2:
                     self.account_updated += 1
                 self.account_treated += 1
+
+        # Stop here : init sync
+        if 'account_only' in context:
+            return self
 
         # Second pass, fetch operation from bankAccount
         for account_type in ['Checkings']:
@@ -289,20 +303,28 @@ class linxo_sync(osv.osv_memory):
         if transaction_ids:
             local_transaction = transaction_obj.browse(cr, uid, transaction_ids[0], context=context)
 
+
+            to_return = 0
             for data_type in _get_data_types():
                 temp_changes = check_changes(local_transaction, transaction, _get_translation_dict(data_type), data_type)
                 if temp_changes:
                     transaction_values = _get_values(local_account)
                     transaction_obj.write(cr, uid, transaction_ids, transaction_values, context=context)
                     _logger.debug('updated transaction %d' % transaction_ids[0])
-                    return 2
+                    to_return = 2
+                    break
             _logger.debug('nothing to do for transaction %d' % transaction_ids[0])
-            return 0
+
+            if not local_transaction.account_move_line_id:
+                transaction_obj.search_reconciliation(cr, uid, [transaction_ids[0]], context=context)
+
+            return to_return
 
         else:
             transaction_values = _get_values(local_account)
             tr_id = transaction_obj.create(cr, uid, transaction_values, context=context)
             _logger.debug('created new transaction %d' % tr_id)
+            transaction_obj.search_reconciliation(cr, uid, [tr_id], context=context)
             return 1
 
 
@@ -433,7 +455,6 @@ class linxo_sync(osv.osv_memory):
                 'password' : self.password,
             },
         }
-        _logger.debug('Going to log using %s %s' % (self.username, self.password))
 
         self._perform_query(payload)
         self.logged_in = True
@@ -497,6 +518,9 @@ class linxo_sync(osv.osv_memory):
 
         # Now r.text should contain )]}'\n , remove that and jsonize
         raw_json = re.compile('\)\]\}\'\n').sub('', result.text)
+
+        _logger.debug('raw_json')
+        _logger.debug(raw_json)
 
         # Result are check according to functions called
         json_response = json.loads(raw_json)
@@ -607,7 +631,7 @@ class linxo_transaction(osv.osv):
     """ Bank Transaction stored on Linxo """
     _name = 'linxo.transaction'
     _columns = {
-        'linxo_id' : fields.integer('Linxo Transaction ID', required=True),
+        'linxo_id': fields.integer('Linxo Transaction ID', required=True),
         'account_id': fields.many2one(
             'linxo.account', 'Linxo Account', ondelete='cascade'),
         'account_move_line_id': fields.many2one(
@@ -634,46 +658,233 @@ class linxo_transaction(osv.osv):
     _rec_name = 'label'
     _order = 'date desc'
 
-    def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):
-        #if (not view_id) and (view_type=='form') and context and context.get('force_email', False):
-        #    view_id = self.pool.get('ir.model.data').get_object_reference(cr, user, 'base', 'view_partner_simple_form')[1]
-        #res = super(res_partner,self).fields_view_get(cr, user, view_id, view_type, context, toolbar=toolbar, submenu=submenu)
+    #def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):
+    #    #if (not view_id) and (view_type=='form') and context and context.get('force_email', False):
+    #    #    view_id = self.pool.get('ir.model.data').get_object_reference(cr, user, 'base', 'view_partner_simple_form')[1]
+    #    #res = super(res_partner,self).fields_view_get(cr, user, view_id, view_type, context, toolbar=toolbar, submenu=submenu)
 
-        #if view_type == 'form':
-        #    res['arch'] = self.fields_view_get_address(cr, user, res['arch'], context=context)
+    #    #if view_type == 'form':
+    #    #    res['arch'] = self.fields_view_get_address(cr, user, res['arch'], context=context)
 
-        res = super(linxo_transaction, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar, submenu=submenu)
+    #    res = super(linxo_transaction, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar, submenu=submenu)
 
-        # Only on form view
-        if view_type == 'form':
-            for key in context:
-                _logger.debug('context key %s value %s' % (key,context[key]))
+    #    # Only on form view
+    #    if view_type == 'form':
+    #        for key in context:
+    #            _logger.debug('context key %s value %s' % (key,context[key]))
 
-            transaction = self.browse(cr, SUPERUSER_ID, uid, context=context)
+    #        transaction = self.browse(cr, SUPERUSER_ID, uid, context=context)
 
-            eview = etree.XML(res['arch'])
-            for node in eview.xpath("//field[@name='account_move_line_id']"):
-                extra_context = "{'tree_view_ref': 'linxo.view_linxo_moves_tree', 'search_view_ref': 'linxo.view_linxo_moves_search'}"
-                #if transaction.amount > 0:
-                    #domain =  "[('credit', '=',%f )]" % abs(transaction.amount)
-                    #extra_context = extra_context + " 'search_default_credit':%f }" % abs(transaction.amount)
-                #else:
-                    #domain =  "[('debit', '=',%f )]" % abs(transaction.amount)
-                    #extra_context = extra_context + " 'search_default_debit':%f }" % abs(transaction.amount)
-                #node.set('domain', domain)
-                node.set('context', extra_context)
-            res['arch'] = etree.tostring(eview)
+    #        eview = etree.XML(res['arch'])
+    #        for node in eview.xpath("//field[@name='account_move_line_id']"):
+    #            extra_context = "{'tree_view_ref': 'linxo.view_linxo_moves_tree', 'search_view_ref': 'linxo.view_linxo_moves_search'}"
+    #            #if transaction.amount > 0:
+    #                #domain =  "[('credit', '=',%f )]" % abs(transaction.amount)
+    #                #extra_context = extra_context + " 'search_default_credit':%f }" % abs(transaction.amount)
+    #            #else:
+    #                #domain =  "[('debit', '=',%f )]" % abs(transaction.amount)
+    #                #extra_context = extra_context + " 'search_default_debit':%f }" % abs(transaction.amount)
+    #            #node.set('domain', domain)
+    #            node.set('context', extra_context)
+    #        res['arch'] = etree.tostring(eview)
 
-            _logger.debug('final res')
-            _logger.debug(res['arch'])
-        return res
+    #        _logger.debug('final res')
+    #        _logger.debug(res['arch'])
+    #    return res
 
     # on change account_move_line_id
-    #def on_change_account_move_line_id():
+    def apply_reconciliation(self, cr, uid, ids, context=None):
+        """Mark account move as ok only if amount match
+        Also mark invoice as paid, only if amount match
+        """
+        transactions = self.browse(cr, uid, ids, context=context)
+
+        obj_move = self.pool.get('account.move')
+        obj_invoice = self.pool.get('account.invoice')
+
+        for transaction in transactions:
+            if transaction.account_move_line_id:
+                account_move_line = transaction.account_move_line_id
+
+                account_move = account_move_line.move_id
+
+                # Check that balance is 0 and amount match
+                if account_move.balance != 0.0:
+                    raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move is not balance"))
+                if account_move.amount != abs(transaction.amount):
+                    raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move amount differs from the transaction"))
+
+                # So far ok, if draft, make is as OK
+                if account_move.state == 'draft':
+                    _logger.debug('Marking account_move as validate')
+                    obj_move.button_validate(cr, uid, [account_move.id], context=context)
+
+                for line in account_move.line_id:
+                    # If associated bills, mark them as paid
+                    if line.invoice:
+                        invoice = line.invoice
+
+                        if invoice.state == 'open':
+                            if invoice.amount_total != transaction.amount:
+                                _logger.debug('Not marking invoice as paid because amount does not match')
+                            else:
+                                _logger.debug('Marking invoice as paid')
+                                obj_invoice.invoice_pay_customer(cr, uid, [invoice.id], context=context)
+
+    def search_reconciliation(self, cr, uid, ids, context=None):
+        transactions = self.browse(cr, uid, ids, context=context)
+        for transaction in transactions:
+            search_args = [
+                ('journal_id', '=', transaction.journal_id.id),
+            ]
+
+            if transaction.amount > 0:
+                search_args.append(('debit', '=', transaction.amount))
+            else:
+                search_args.append(('credit', '=', -transaction.amount))
+
+            date_base = transaction.date
+            date_test = [date_base]
+
+            # TODO : limit to 5 ?
+            for drift in (1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, -7, -8, -9, -10):
+                date = datetime.datetime.strptime(date_base,"%Y-%m-%d") + datetime.timedelta(days=int(drift))
+                date_test.append(date.strftime("%Y-%m-%d"))
+
+            obj_move_line = self.pool.get('account.move.line')
+            move_line_ids = None
+
+            # Perform search starting from today and go back in time
+            # Transaction usually appear after date in openerp
+            for date in date_test:
+                final_search = list(search_args)
+                final_search.append(('date', '=', date))
+                move_line_ids = obj_move_line.search(cr, uid, final_search, context=context)
+                if move_line_ids:
+                    _logger.debug('Found account move line for date %s' % date)
+                    break
+
+            if not move_line_ids:
+                pass
+            elif len(move_line_ids) > 1:
+                _logger.debug('Find more than one account.move.line')
+            else:
+                vals = { 'account_move_line_id' : move_line_ids[0] }
+                self.write(cr, uid, [transaction.id], vals, context=context)
+
+
+    def write(self, cr, uid, ids, vals, context=None):
+        self.apply_reconciliation(cr, uid, ids, context=None)
+        return super(linxo_transaction, self).write(cr, uid, ids, vals, context=context)
+
 
     # Mark those account_move_line as marked
     # Check associated account_move : if ok, mark ok
     # Check assoaciated invoices : if ok, mark paid
 
+    def open_wizard(self, cr, uid, ids, context=None):
+        if context is None: 
+            context = {}
+        if not ids: 
+            return False
+        if not isinstance(ids, list): 
+            ids = [ids]
 
-()
+        transaction = self.browse(cr, uid, ids, context=context)[0]
+
+        vals = { 'transaction_id': ids[0], 'date': transaction.date }
+        if transaction.amount > 0:
+            vals['debit'] = transaction.amount
+        else:
+            vals['credit'] = -transaction.amount
+
+        wizard_id = self.pool.get('linxo.reconcile').create(cr, uid, vals=vals, context=context)
+        return {
+            'name': 'Reconcile Wizard',
+            'view_type': 'form',
+            'view_mode': 'form',
+            'res_model': 'linxo.reconcile',
+            'res_id': wizard_id,
+            'type': 'ir.actions.act_window',
+            'target': 'new',
+            'context': context,
+        }
+
+linxo_transaction()
+
+class linxo_reconcile(osv.osv_memory):
+    _name='linxo.reconcile'
+
+    def _get_candidates(self, cr, uid, ids, field_name, arg, context):
+        """Will return a list of ids according to the match
+        """
+        result = {}
+
+        wizard = self.browse(cr, uid, ids, context=context)[0]
+        wizard_id = ids[0]
+
+        transaction = wizard.transaction_id
+        if not transaction:
+            return result
+
+        search_args = [
+            #('date', '=', wizard.date),
+            ('journal_id', '=', transaction.journal_id.id),
+        ]
+
+        if wizard.credit:
+            search_args.append(('credit', '=', wizard.credit))
+        else:
+            search_args.append(('debit', '=', wizard.debit))
+
+        _logger.debug('searching wizard with')
+        _logger.debug(search_args)
+        account_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
+
+        if account_ids:
+            result[wizard_id] = account_ids
+        else:
+            #res[i] must be set to False and not to None because of XML:RPC
+            # "cannot marshal None unless allow_none is enabled"
+            result[wizard_id] = False
+
+        return result
+
+    def _get_candidates_test(self, cr, uid, context=None):
+        if context is None: context = {}
+
+        if 'active_ids' in context:
+            active_ids = context['active_ids']
+            transaction_obj = self.pool.get('linxo.transaction')
+            transaction = transaction_obj.browse(cr, uid, active_ids, context=context)[0]
+
+            search_args = [
+                ('journal_id', '=', transaction.journal_id.id),
+            ]
+
+            if transaction.amount > 0:
+                search_args.append(('debit', '=', transaction.amount))
+            else:
+                search_args.append(('credit', '=', -transaction.amount))
+
+            account_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
+            return account_ids
+        return []
+
+
+    _columns = {
+        'date': fields.date('Date'),
+        'debit': fields.float('Amount', digits_compute=dp.get_precision('Account')),
+        'credit': fields.float('Amount', digits_compute=dp.get_precision('Account')),
+        'transaction_id': fields.many2one('linxo.transaction', 'Original Transaction'),
+        'candidates' : fields.function(_get_candidates, type='one2many', obj='account.move.line', method=True, string='Matching Transactions'),
+    }
+
+    def find_candidates(self, cr, uid, ids, context=None):
+        for key in context:
+            _logger.debug('context key %s value %s' % (key,context[key]))
+
+        return {
+                'type': 'ir.actions.act_window_close',
+         }
+linxo_reconcile()
