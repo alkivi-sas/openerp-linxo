@@ -774,7 +774,7 @@ class linxo_transaction(osv.osv):
                     _logger.debug('Found account move line for date %s' % date)
                     # Extra check, do we already have a transaction with this id ?
                     if len(move_line_ids) == 1:
-                        test_args = [('account_move_line_id', '=', move_line_ids[0])]
+                        test_search = [('account_move_line_id', '=', move_line_ids[0])]
                         test_ids = self.search(cr, uid, test_search, context=context)
                         if not test_ids:
                             _logger.debug('This account.move.line is unsed, let\'s use it !')
