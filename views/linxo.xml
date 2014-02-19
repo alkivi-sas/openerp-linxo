@@ -141,12 +141,38 @@
         <record model="ir.actions.act_window" id="action_linxo_transaction">
             <field name="name">Transactions</field>
             <field name="res_model">linxo.transaction</field>
-            <field name="view_type">form</field>
             <field name="view_mode">tree,form</field>
             <field name="search_view_id" ref="view_linxo_transaction_search"/>
             <field name="context">{"search_default_unreconciled":1}</field>
         </record>
         <menuitem name="Transactions" parent="base.menu_linxo_root" id="menu_linxo_transaction" action="action_linxo_transaction" />
+
+        <record model="ir.ui.view" id="view_move_line_search">
+            <field name="name">account.move.search</field>
+            <field name="model">account.move.line</field>
+            <field name="arch" type="xml">
+                <search string="Matching Moves">
+                    <field name="date" string="Date"/>
+                </search>
+            </field>
+        </record>
+
+        <!--
+        <record model="ir.ui.view" id="view_move_line_tree">
+            <field name="name">account.move.line.tree</field>
+            <field name="model">account.move.line</field>
+            <field name="inherit_id" ref="base.view_move_line_tree"/>
+            <field name="arch" type="xml">
+            </field>
+        </record>
+        -->
+        <record model="ir.actions.act_window" id="action_move_line">
+            <field name="name">Unmatched Move</field>
+            <field name="res_model">account.move.line</field>
+            <field name="view_mode">tree</field>
+            <field name="search_view_id" ref="view_move_line_search"/>
+        </record>
+        <menuitem name="Moves" parent="base.menu_linxo_root" id="menu_move_line" action="action_move_line" />
 
         <!-- Sync Form View -->
         <record model="ir.ui.view" id="view_linxo_sync_form">

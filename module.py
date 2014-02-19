@@ -911,3 +911,20 @@ class linxo_reconcile(osv.osv_memory):
                 'type': 'ir.actions.act_window_close',
          }
 linxo_reconcile()
+
+class account_move_line(osv.osv):
+    _inherit = 'account.move.line'
+    _columns = {}
+
+    def _query_get(self, cr, uid, obj='l', context=None):
+        query = 'select * from account_move_line'
+        _logger.debug('fejfkezjfkezjfkezjfkzejfkezjfkze')
+        return query
+
+    def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):       
+        _logger.debug('fejfkezjfkezjfkezjfkzejfkezjdkazdkazdkazldkazldkazfkze')
+        result = super(account_move_line, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar, submenu)
+        return result
+
+
+account_move_line()
