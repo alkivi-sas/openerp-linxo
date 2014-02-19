@@ -72,11 +72,13 @@
             <field name="type">tree</field>
             <field name="arch" type="xml">
                 <tree string="Linxo Transactions" create="false">
+                    <button string="Auto Reconcile" type="object" name="do_reconciliation" icon="STOCK_EXECUTE"/>
                     <field name="date" readonly="1" />
                     <field name="label" readonly="1" />
+                    <field name="notes" readonly="1" />
+                    <field name="journal_id" readonly="1"/>
                     <field name="amount" readonly="1" />
                     <field name="account_move_line_id" />
-                    <field name="notes" readonly="1" />
                 </tree>
             </field>
         </record>
@@ -150,7 +152,6 @@
         <record model="ir.ui.view" id="view_linxo_sync_form">
             <field name="name">linxo.sync.form</field>
             <field name="model">linxo.sync</field>
-            <field name="type">form</field>
             <field name="arch" type="xml">
                 <form string="Manual Sync" version="7.0" create="false" edit="false" delete="false">
                     <group colspan="2" col="2">
@@ -163,7 +164,6 @@
                     </group>
                     <button string="Launch Account Sync" type="object" name="do_sync" class="oe_highlight" context="{'account_only':1}"/>
                     <button string="Launch Manual Sync" type="object" name="do_sync" class="oe_highlight"/>
-                    <button string="Launch Manual Reconciliation" type="object" name="do_reconciliation" class="oe_highlight"/>
                 </form>
             </field>
         </record>
@@ -185,6 +185,8 @@
             <field name="type">form</field>
             <field name="arch" type="xml">
                 <form string="Reconciliation Wizard" version="7.0">
+                    <header>
+                    </header>
                     <group colspan="4" col="2">
                         <field name="date" readonly="1" />
                         <field name="debit" readonly="1" />

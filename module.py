@@ -734,20 +734,30 @@ class linxo_transaction(osv.osv):
     def search_reconciliation(self, cr, uid, ids, context=None):
         transactions = self.browse(cr, uid, ids, context=context)
         for transaction in transactions:
+
+            # Already matched ?
+            if transaction.account_move_line_id:
+                continue
+
+            # From journal we need to extract default debit and credit account
+            journal = transaction.journal_id
+
             search_args = [
-                ('journal_id', '=', transaction.journal_id.id),
+                ('journal_id', '=', journal.id),
             ]
 
             if transaction.amount > 0:
                 search_args.append(('debit', '=', transaction.amount))
+                search_args.append(('account_id', '=', journal.default_debit_account_id.id ))
             else:
                 search_args.append(('credit', '=', -transaction.amount))
+                search_args.append(('account_id', '=', journal.default_credit_account_id.id ))
 
             date_base = transaction.date
             date_test = [date_base]
 
             # TODO : limit to 5 ?
-            for drift in (1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, -7, -8, -9, -10):
+            for drift in (1, -1, 2, -2, 3, -3, 4, -4, 5, -5):
                 date = datetime.datetime.strptime(date_base,"%Y-%m-%d") + datetime.timedelta(days=int(drift))
                 date_test.append(date.strftime("%Y-%m-%d"))
 
@@ -762,6 +772,12 @@ class linxo_transaction(osv.osv):
                 move_line_ids = obj_move_line.search(cr, uid, final_search, context=context)
                 if move_line_ids:
                     _logger.debug('Found account move line for date %s' % date)
+                    # Extra check, do we already have a transaction with this id ?
+                    if len(move_line_ids) == 1:
+                        test_args = [('account_move_line_id', '=', move_line_ids[0])]
+                        test_ids = self.search(cr, uid, test_search, context=context)
+                        if not test_ids:
+                            _logger.debug('This account.move.line is unsed, let\'s use it !')
                     break
 
             if not move_line_ids:
@@ -769,6 +785,7 @@ class linxo_transaction(osv.osv):
             elif len(move_line_ids) > 1:
                 _logger.debug('Find more than one account.move.line')
             else:
+
                 vals = { 'account_move_line_id' : move_line_ids[0] }
                 self.write(cr, uid, [transaction.id], vals, context=context)
 
@@ -778,9 +795,10 @@ class linxo_transaction(osv.osv):
         return super(linxo_transaction, self).write(cr, uid, ids, vals, context=context)
 
 
-    # Mark those account_move_line as marked
-    # Check associated account_move : if ok, mark ok
-    # Check assoaciated invoices : if ok, mark paid
+    def do_reconciliation(self, cr, uid, ids, context=None):
+        """Perform reconciliation on all unmark transaction
+        """
+        self.search_reconciliation(cr, uid, ids, context=context)
 
     def open_wizard(self, cr, uid, ids, context=None):
         if context is None: 
@@ -858,14 +876,19 @@ class linxo_reconcile(osv.osv_memory):
             transaction_obj = self.pool.get('linxo.transaction')
             transaction = transaction_obj.browse(cr, uid, active_ids, context=context)[0]
 
+            # From journal we need to extract default debit and credit account
+            journal = transaction.journal_id
+
             search_args = [
-                ('journal_id', '=', transaction.journal_id.id),
+                ('journal_id', '=', journal.id),
             ]
 
             if transaction.amount > 0:
                 search_args.append(('debit', '=', transaction.amount))
+                search_args.append(('account_id', '=', journal.default_debit_account_id.id ))
             else:
                 search_args.append(('credit', '=', -transaction.amount))
+                search_args.append(('account_id', '=', journal.default_credit_account_id.id ))
 
             account_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
             return account_ids
