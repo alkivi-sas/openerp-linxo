@@ -1,4 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_linxo_account,linxo.account,model_linxo_account,base.group_user,1,1,1,1
-access_linxo_transaction,linxo.transaction,model_linxo_transaction,base.group_user,1,1,1,1
+access_linxo_account,linxo.account,model_linxo_account,account.group_account_user,1,1,1,1
+access_linxo_transaction,linxo.transaction,model_linxo_transaction,account.group_account_user,1,1,1,1
+access_linxo_sync,linxo.sync,model_linxo_sync,account.group_account_user,1,1,1,1
 

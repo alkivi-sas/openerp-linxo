@@ -2,7 +2,7 @@
 <openerp>
     <data>
         <!-- Top menu item -->
-        <menuitem name="Tools" id="base.menu_tools" sequence="120" groups="base.group_tool_user"/>
+        <menuitem name="Tools" id="base.menu_tools" sequence="120" groups="account.group_account_user"/>
 
 
         <!-- Accounts Search View-->
@@ -46,7 +46,7 @@
             <field name="context">{"search_default_journal_id":False}</field>
         </record>
 
-        <menuitem name="Linxo" parent="base.menu_tools" id="base.menu_linxo_root" sequence="10" />
+        <menuitem name="Linxo" parent="base.menu_tools" id="base.menu_linxo_root" sequence="10" groups="account.group_account_user" />
         <menuitem name="Bank Accounts" parent="base.menu_linxo_root" id="menu_linxo_accounts" action="action_linxo_account" sequence="10"/>
 
 
@@ -157,15 +157,6 @@
             </field>
         </record>
 
-        <!--
-        <record model="ir.ui.view" id="view_move_line_tree">
-            <field name="name">account.move.line.tree</field>
-            <field name="model">account.move.line</field>
-            <field name="inherit_id" ref="base.view_move_line_tree"/>
-            <field name="arch" type="xml">
-            </field>
-        </record>
-        -->
         <record model="ir.actions.act_window" id="action_move_line">
             <field name="name">Unmatched Move</field>
             <field name="res_model">account.move.line</field>
