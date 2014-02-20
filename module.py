@@ -778,6 +778,9 @@ class linxo_transaction(osv.osv):
                         test_ids = self.search(cr, uid, test_search, context=context)
                         if not test_ids:
                             _logger.debug('This account.move.line is unsed, let\'s use it !')
+                        else:
+                            _logger.debug('This account.move.line is already use, skipping it')
+                            continue
                     break
 
             if not move_line_ids:
@@ -934,7 +937,8 @@ class account_move_line(osv.osv):
             query = query + 'AND id IN '
 
         query = query + '(SELECT account_move_line_id FROM linxo_transaction WHERE account_move_line_id > 0) ' \
-                'AND account_id IN (SELECT default_debit_account_id FROM account_journal WHERE id IN (SELECT journal_id FROM linxo_account))' 
+                'AND account_id IN (SELECT default_debit_account_id FROM account_journal WHERE id IN (SELECT journal_id FROM linxo_account)) ' \
+                'AND period_id IN (SELECT id FROM account_period WHERE state = \'draft\')'
 
         cr.execute(query)
         res = cr.fetchall()
