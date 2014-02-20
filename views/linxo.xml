@@ -47,7 +47,7 @@
         </record>
 
         <menuitem name="Linxo" parent="base.menu_tools" id="base.menu_linxo_root" sequence="10" />
-        <menuitem name="Bank Accounts" parent="base.menu_linxo_root" id="menu_linxo_accounts" action="action_linxo_account" />
+        <menuitem name="Bank Accounts" parent="base.menu_linxo_root" id="menu_linxo_accounts" action="action_linxo_account" sequence="10"/>
 
 
         <!-- Transaction Search View-->
@@ -145,14 +145,14 @@
             <field name="search_view_id" ref="view_linxo_transaction_search"/>
             <field name="context">{"search_default_unreconciled":1}</field>
         </record>
-        <menuitem name="Transactions" parent="base.menu_linxo_root" id="menu_linxo_transaction" action="action_linxo_transaction" />
+        <menuitem name="Transactions" parent="base.menu_linxo_root" id="menu_linxo_transaction" action="action_linxo_transaction" sequence="11" />
 
         <record model="ir.ui.view" id="view_move_line_search">
             <field name="name">account.move.search</field>
             <field name="model">account.move.line</field>
             <field name="arch" type="xml">
                 <search string="Matching Moves">
-                    <field name="date" string="Date"/>
+                    <filter string="Unreconciled" name="unreconciled" domain="[('unreconciled','=',True)]"/>
                 </search>
             </field>
         </record>
@@ -171,8 +171,9 @@
             <field name="res_model">account.move.line</field>
             <field name="view_mode">tree</field>
             <field name="search_view_id" ref="view_move_line_search"/>
+            <field name="context">{"search_default_unreconciled":1}</field>
         </record>
-        <menuitem name="Moves" parent="base.menu_linxo_root" id="menu_move_line" action="action_move_line" />
+        <menuitem name="Moves" parent="base.menu_linxo_root" id="menu_move_line" action="action_move_line" sequence="12" />
 
         <!-- Sync Form View -->
         <record model="ir.ui.view" id="view_linxo_sync_form">
@@ -201,7 +202,7 @@
             <field name="view_type">form</field>
             <field name="view_mode">form</field>
         </record>
-        <menuitem name="Manual Sync" parent="base.menu_linxo_root" id="menu_linxo_sync" action="action_linxo_sync" />
+        <menuitem name="Manual Sync" parent="base.menu_linxo_root" id="menu_linxo_sync" action="action_linxo_sync" sequence="13" />
 
 
         <!-- Reconcile Wizard -->

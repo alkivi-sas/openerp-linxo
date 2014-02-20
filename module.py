@@ -914,17 +914,54 @@ linxo_reconcile()
 
 class account_move_line(osv.osv):
     _inherit = 'account.move.line'
-    _columns = {}
 
-    def _query_get(self, cr, uid, obj='l', context=None):
-        query = 'select * from account_move_line'
-        _logger.debug('fejfkezjfkezjfkezjfkzejfkezjfkze')
-        return query
+    def _search_reconciled(self, cr, uid, obj, name, args, context=None):
+        only_unreconciled = False
+        for arg in args:
+            if arg[0] == 'unreconciled' and arg[1] == '=' and arg[2] == True:
+                only_unreconciled = True
 
-    def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):       
-        _logger.debug('fejfkezjfkezjfkezjfkzejfkezjdkazdkazdkazldkazldkazfkze')
-        result = super(account_move_line, self).fields_view_get(cr, uid, view_id, view_type, context, toolbar, submenu)
-        return result
+        # Only linxo_account jorunal
+        # Only id present in linxo transaction
+        # Only account that match account_journal as defined on journal as defined in linxo_account ...
+        query = 'SELECT id FROM account_move_line ' \
+                'WHERE journal_id IN ' \
+                '(SELECT journal_id FROM linxo_account) '
+
+        if only_unreconciled:
+            query = query + 'AND id NOT IN '
+        else:
+            query = query + 'AND id IN '
+
+        query = query + '(SELECT account_move_line_id FROM linxo_transaction WHERE account_move_line_id > 0) ' \
+                'AND account_id IN (SELECT default_debit_account_id FROM account_journal WHERE id IN (SELECT journal_id FROM linxo_account))' 
+
+        cr.execute(query)
+        res = cr.fetchall()
+
+        return [('id', 'in', [x[0] for x in res])]
+        
+    def _get_unreconciled(self, cr, uid, ids, field_name, arg, context):
+        res = {}
+        for i in ids:
+            move_obj = self.pool.get('linxo.translation')
+            search = [('account_move_line_id', '=', i)]
+            test_ids = move_obj.search(cr, uid, search, context=context)
+            if test_ids:
+                res[i] = False
+            else:
+                res[i] = True
+        return res
+
+    _columns = {
+        'unreconciled' : fields.function(
+            _get_unreconciled,
+            fnct_search=_search_reconciled,
+            type='boolean',
+            method=True,
+            string='Reconciled'),
+    }
+
 
 
 account_move_line()
