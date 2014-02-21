@@ -519,9 +519,6 @@ class linxo_sync(osv.osv_memory):
         # Now r.text should contain )]}'\n , remove that and jsonize
         raw_json = re.compile('\)\]\}\'\n').sub('', result.text)
 
-        _logger.debug('raw_json')
-        _logger.debug(raw_json)
-
         # Result are check according to functions called
         json_response = json.loads(raw_json)
 
@@ -719,17 +716,6 @@ class linxo_transaction(osv.osv):
                     _logger.debug('Marking account_move as validate')
                     obj_move.button_validate(cr, uid, [account_move.id], context=context)
 
-                for line in account_move.line_id:
-                    # If associated bills, mark them as paid
-                    if line.invoice:
-                        invoice = line.invoice
-
-                        if invoice.state == 'open':
-                            if invoice.amount_total != transaction.amount:
-                                _logger.debug('Not marking invoice as paid because amount does not match')
-                            else:
-                                _logger.debug('Marking invoice as paid')
-                                obj_invoice.invoice_pay_customer(cr, uid, [invoice.id], context=context)
 
     def search_reconciliation(self, cr, uid, ids, context=None):
         transactions = self.browse(cr, uid, ids, context=context)
@@ -769,6 +755,8 @@ class linxo_transaction(osv.osv):
             for date in date_test:
                 final_search = list(search_args)
                 final_search.append(('date', '=', date))
+                _logger.debug('searching for date %s' % date)
+                _logger.debug(final_search)
                 move_line_ids = obj_move_line.search(cr, uid, final_search, context=context)
                 if move_line_ids:
                     _logger.debug('Found account move line for date %s' % date)
@@ -794,8 +782,9 @@ class linxo_transaction(osv.osv):
 
 
     def write(self, cr, uid, ids, vals, context=None):
+        res = super(linxo_transaction, self).write(cr, uid, ids, vals, context=context)
         self.apply_reconciliation(cr, uid, ids, context=None)
-        return super(linxo_transaction, self).write(cr, uid, ids, vals, context=context)
+        return res
 
 
     def do_reconciliation(self, cr, uid, ids, context=None):
@@ -858,8 +847,6 @@ class linxo_reconcile(osv.osv_memory):
         else:
             search_args.append(('debit', '=', wizard.debit))
 
-        _logger.debug('searching wizard with')
-        _logger.debug(search_args)
         account_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
 
         if account_ids:
