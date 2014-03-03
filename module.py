@@ -935,7 +935,7 @@ class account_move_line(osv.osv):
     def _get_unreconciled(self, cr, uid, ids, field_name, arg, context):
         res = {}
         for i in ids:
-            move_obj = self.pool.get('linxo.translation')
+            move_obj = self.pool.get('linxo.transaction')
             search = [('account_move_line_id', '=', i)]
             test_ids = move_obj.search(cr, uid, search, context=context)
             if test_ids:
