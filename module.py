@@ -119,6 +119,12 @@ class linxo_sync(osv.osv_memory):
     def do_sync(self, cr, uid, ids, context=None):
         """Perform sync with openerp server"""
 
+        if not context:
+            context={}
+
+        # batch context key will be use not to raise exeption
+        context['batch'] = True
+
         # Move this to overrided __init__ ?
         self.base_domain = 'wwws.linxo.com'
         self.verify_ssl = True
@@ -694,10 +700,17 @@ class linxo_transaction(osv.osv):
         """Mark account move as ok only if amount match
         Also mark invoice as paid, only if amount match
         """
+        if not context:
+            context = {}
+
         transactions = self.browse(cr, uid, ids, context=context)
 
         obj_move = self.pool.get('account.move')
         obj_invoice = self.pool.get('account.invoice')
+
+        do_raise = True
+        if 'batch' in context:
+            do_raise = False
 
         for transaction in transactions:
             if transaction.account_move_line_id:
@@ -707,9 +720,15 @@ class linxo_transaction(osv.osv):
 
                 # Check that balance is 0 and amount match
                 if account_move.balance != 0.0:
-                    raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move is not balance"))
+                    if do_raise:
+                        raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move is not balance"))
+                    else:
+                        continue
                 if account_move.amount != abs(transaction.amount):
-                    raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move amount differs from the transaction"))
+                    if do_raise:
+                        raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move amount differs from the transaction"))
+                    else:
+                        continue
 
                 # So far ok, if draft, make is as OK
                 if account_move.state == 'draft':
@@ -782,8 +801,13 @@ class linxo_transaction(osv.osv):
 
 
     def write(self, cr, uid, ids, vals, context=None):
+        """Override write to apply reconciliation immediatelly
+        """
+        if not context:
+            context = {}
+
         res = super(linxo_transaction, self).write(cr, uid, ids, vals, context=context)
-        self.apply_reconciliation(cr, uid, ids, context=None)
+        self.apply_reconciliation(cr, uid, ids, context=context)
         return res
 
 
