@@ -1007,8 +1007,6 @@ class account_move_line(osv.osv):
             raise osv.except_osv(_("Warning"), _("I dont have a transaction associated, this is weird."))
 
         transaction_id = context['transaction_id']
-        transaction = self.pool.get('linxo.transaction').browse(cr, uid, transaction_id, context=context)
-
         vals = { 'account_move_line_id' : ids[0] }
         self.pool.get('linxo.transaction').write(cr, uid, [transaction_id], vals, context=context)
 
@@ -1031,6 +1029,57 @@ class account_invoice(osv.osv):
         transaction = self.pool.get('linxo.transaction').browse(cr, uid, transaction_id, context=context)
 
         _logger.debug('I should mark this invoice has paid, and then do crazy stuff')
+
+        invoice = self.browse(cr, uid, ids[0], context=context)
+        move = invoice.move_id
+        
+        # First part, create voucher
+        account = transaction.journal_id.default_credit_account_id or transaction.journal_id.default_debit_account_id.id
+        period_id = self.pool.get('account.voucher')._get_period(cr, uid)
+        _logger.debug('period')
+        _logger.debug(period_id)
+
+        partner_id = self.pool.get('res.partner')._find_accounting_partner(invoice.partner_id).id,
+
+        voucher_data = {
+            'partner_id': partner_id,
+            'amount': abs(transaction.amount),
+            'journal_id': transaction.journal_id.id,
+            'period_id': period_id,
+            'move_id': invoice.move_id.id,
+            'account_id' : account.id,
+            'type': invoice.type in ('out_invoice','out_refund') and 'receipt' or 'payment',
+            'reference' : invoice.name,
+        }
+        _logger.debug('voucher_data')
+        _logger.debug(voucher_data)
+
+        voucher_id = self.pool.get('account.voucher').create(cr, uid, voucher_data, context=context)
+        _logger.debug('test')
+        _logger.debug(voucher_id)
+
+        for move_line in invoice.move_id.line_id:
+            line_data = {
+                'voucher_id' : voucher_id,
+                'move_line_id' : move_line.id,
+                'account_id' : account.id,
+                'partner_id' : partner_id,
+                'amount': abs(move_line.credit) or abs(move_line.debit),
+                'type': invoice.type in ('out_invoice','out_refund') and 'dr' or 'cr',
+            }
+            _logger.debug('line_data')
+            _logger.debug(line_data)
+
+            line_id = self.pool.get('account.voucher.line').create(cr, uid, line_data, context=context)
+
+            _logger.debug('testline')
+            _logger.debug(line_id)
+
+        voucher = self.pool.get('account.voucher').button_proforma_voucher(cr, uid, [voucher_id], context=context)
+        _logger.debug('test2')
+        _logger.debug(voucher)
+
+
 
         #vals = { 'account_move_line_id' : ids[0] }
         #self.pool.get('linxo.transaction').write(cr, uid, [transaction_id], vals, context=context)
