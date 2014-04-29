@@ -131,6 +131,7 @@
                     <button name="open_wizard"
                         string="Reconcile Wizard" 
                         type="object" 
+                        context="{'transaction_id': active_id}"
                         help="Find associated movement" attrs="{'invisible':[('account_move_line_id','!=',False)]}" 
                         class="oe_highlight" />
                 </form>
@@ -203,25 +204,36 @@
             <field name="type">form</field>
             <field name="arch" type="xml">
                 <form string="Reconciliation Wizard" version="7.0">
-                    <header>
-                    </header>
-                    <group colspan="4" col="2">
+                    <group string="Search criteria" col="4">
                         <field name="date" readonly="1" />
                         <field name="debit" readonly="1" />
                         <field name="credit" readonly="1" />
+                        <field name="transaction_id" readonly="1" />
                     </group>
-                    <sheet>
-                        <field name='candidates'>
-                            <tree string="Matching candidates">
-                                <field name="date" readonly="1" />
-                                <field name="debit" readonly="1" />
-                                <field name="credit" readonly="1" />
-                                <field name="state" readonly="1" />
-                                <field name="partner_id" readonly="1" />
-                            </tree>
-                        </field>
-                        <button special="cancel" string="Cancel"/>
-                    </sheet>
+                    <separator string="Matching Account Move Line" colspan="4"/>
+                    <field name='candidates' context="{'transaction_id': transaction_id}">
+                        <tree>
+                            <field name="date" readonly="1" />
+                            <field name="debit" readonly="1" />
+                            <field name="credit" readonly="1" />
+                            <field name="state" readonly="1" />
+                            <field name="partner_id" readonly="1" />
+                            <button string="I'm the correct one" type="object" name="do_reconciliation" icon="STOCK_EXECUTE"/>
+                        </tree>
+                    </field>
+                    <separator string="Matching Unpaid Invoices" colspan="4"/>
+                    <field name='invoices' context="{'transaction_id': transaction_id}">
+                        <tree>
+                            <field name="date_due" readonly="1" />
+                            <field name="amount_total" readonly="1" />
+                            <field name="state" readonly="1" />
+                            <field name="partner_id" readonly="1" />
+                            <button string="I'm the correct one" type="object" name="do_reconciliation" icon="STOCK_EXECUTE"/>
+                        </tree>
+                    </field>
+                   <footer>
+                       <button string="Cancel" special="cancel"/>
+                   </footer>
                 </form>
             </field>
         </record>
@@ -233,6 +245,7 @@
             <field name="view_type">form</field>
             <field name="view_id" ref="view_linxo_reconcile" />
             <field name="target">new</field>
+            <field name="context">{'transaction_id': active_id }</field>
         </record>
 
     </data>

@@ -832,6 +832,9 @@ class linxo_transaction(osv.osv):
         else:
             vals['credit'] = -transaction.amount
 
+        # Add transaction id to context
+        context['transaction_id'] = ids[0]
+
         wizard_id = self.pool.get('linxo.reconcile').create(cr, uid, vals=vals, context=context)
         return {
             'name': 'Reconcile Wizard',
@@ -850,7 +853,7 @@ class linxo_reconcile(osv.osv_memory):
     _name='linxo.reconcile'
 
     def _get_candidates(self, cr, uid, ids, field_name, arg, context):
-        """Will return a list of ids according to the match
+        """Will return a list of ids of account.move.line according to amount & co
         """
         result = {}
 
@@ -861,6 +864,8 @@ class linxo_reconcile(osv.osv_memory):
         if not transaction:
             return result
 
+        _logger.debug('Got transaction %d' % transaction.id)
+
         search_args = [
             #('date', '=', wizard.date),
             ('journal_id', '=', transaction.journal_id.id),
@@ -870,6 +875,9 @@ class linxo_reconcile(osv.osv_memory):
             search_args.append(('credit', '=', wizard.credit))
         else:
             search_args.append(('debit', '=', wizard.debit))
+
+        _logger.debug('Search criteria for account.move.line')
+        _logger.debug(search_args)
 
         account_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
 
@@ -882,39 +890,51 @@ class linxo_reconcile(osv.osv_memory):
 
         return result
 
-    def _get_candidates_test(self, cr, uid, context=None):
-        if context is None: context = {}
+    def _get_invoices(self, cr, uid, ids, field_name, arg, context):
+        """Will return a list of ids of unpaid account.invoice, matching amount 
+        """
+        result = {}
 
-        if 'active_ids' in context:
-            active_ids = context['active_ids']
-            transaction_obj = self.pool.get('linxo.transaction')
-            transaction = transaction_obj.browse(cr, uid, active_ids, context=context)[0]
+        wizard = self.browse(cr, uid, ids, context=context)[0]
+        wizard_id = ids[0]
 
-            # From journal we need to extract default debit and credit account
-            journal = transaction.journal_id
+        transaction = wizard.transaction_id
+        if not transaction:
+            return result
 
-            search_args = [
-                ('journal_id', '=', journal.id),
-            ]
+        _logger.debug('Got transaction %d' % transaction.id)
 
-            if transaction.amount > 0:
-                search_args.append(('debit', '=', transaction.amount))
-                search_args.append(('account_id', '=', journal.default_debit_account_id.id ))
-            else:
-                search_args.append(('credit', '=', -transaction.amount))
-                search_args.append(('account_id', '=', journal.default_credit_account_id.id ))
+        search_args = [
+            ('state', '=', 'open')
+        ]
 
-            account_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
-            return account_ids
-        return []
+        if wizard.credit:
+            search_args.append(('amount_total', '=', wizard.credit))
+        else:
+            search_args.append(('amount_total', '=', wizard.debit))
+
+        _logger.debug('Search criteria for account.invoice')
+        _logger.debug(search_args)
+
+        account_ids = self.pool.get('account.invoice').search(cr, uid, search_args, context=context)
+
+        if account_ids:
+            result[wizard_id] = account_ids
+        else:
+            #res[i] must be set to False and not to None because of XML:RPC
+            # "cannot marshal None unless allow_none is enabled"
+            result[wizard_id] = False
+
+        return result
 
 
     _columns = {
         'date': fields.date('Date'),
-        'debit': fields.float('Amount', digits_compute=dp.get_precision('Account')),
-        'credit': fields.float('Amount', digits_compute=dp.get_precision('Account')),
+        'debit': fields.float('Debit', digits_compute=dp.get_precision('Account')),
+        'credit': fields.float('Credit', digits_compute=dp.get_precision('Account')),
         'transaction_id': fields.many2one('linxo.transaction', 'Original Transaction'),
         'candidates' : fields.function(_get_candidates, type='one2many', obj='account.move.line', method=True, string='Matching Transactions'),
+        'invoices' : fields.function(_get_invoices, type='one2many', obj='account.invoice', method=True, string='Matching Unpaid Transaction'),
     }
 
     def find_candidates(self, cr, uid, ids, context=None):
@@ -977,6 +997,43 @@ class account_move_line(osv.osv):
             string='Reconciled'),
     }
 
+    def do_reconciliation(self, cr, uid, ids, context=None):
+        if not context:
+            context = {}
 
+        if not 'transaction_id' in context:
+            _logger.warning('do_reconciliation problem, context is fucked up')
+            _logger.warning(context)
+            raise osv.except_osv(_("Warning"), _("I dont have a transaction associated, this is weird."))
 
+        transaction_id = context['transaction_id']
+        transaction = self.pool.get('linxo.transaction').browse(cr, uid, transaction_id, context=context)
+
+        vals = { 'account_move_line_id' : ids[0] }
+        self.pool.get('linxo.transaction').write(cr, uid, [transaction_id], vals, context=context)
+
+        return True
+account_move_line()
+
+class account_invoice(osv.osv):
+    _inherit = 'account.invoice'
+
+    def do_reconciliation(self, cr, uid, ids, context=None):
+        if not context:
+            context = {}
+
+        if not 'transaction_id' in context:
+            _logger.warning('do_reconciliation problem, context is fucked up')
+            _logger.warning(context)
+            raise osv.except_osv(_("Warning"), _("I dont have a transaction associated, this is weird."))
+
+        transaction_id = context['transaction_id']
+        transaction = self.pool.get('linxo.transaction').browse(cr, uid, transaction_id, context=context)
+
+        _logger.debug('I should mark this invoice has paid, and then do crazy stuff')
+
+        #vals = { 'account_move_line_id' : ids[0] }
+        #self.pool.get('linxo.transaction').write(cr, uid, [transaction_id], vals, context=context)
+
+        return True
 account_move_line()
