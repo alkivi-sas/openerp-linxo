@@ -1034,11 +1034,8 @@ class account_invoice(osv.osv):
         move = invoice.move_id
         
         # First part, create voucher
-        account = transaction.journal_id.default_credit_account_id or transaction.journal_id.default_debit_account_id.id
+        account = transaction.journal_id.default_credit_account_id or transaction.journal_id.default_debit_account_id
         period_id = self.pool.get('account.voucher')._get_period(cr, uid)
-        _logger.debug('period')
-        _logger.debug(period_id)
-
         partner_id = self.pool.get('res.partner')._find_accounting_partner(invoice.partner_id).id,
 
         voucher_data = {
@@ -1046,11 +1043,11 @@ class account_invoice(osv.osv):
             'amount': abs(transaction.amount),
             'journal_id': transaction.journal_id.id,
             'period_id': period_id,
-            'move_id': invoice.move_id.id,
-            'account_id' : account.id,
+            'account_id': account.id,
             'type': invoice.type in ('out_invoice','out_refund') and 'receipt' or 'payment',
             'reference' : invoice.name,
         }
+
         _logger.debug('voucher_data')
         _logger.debug(voucher_data)
 
@@ -1058,31 +1055,58 @@ class account_invoice(osv.osv):
         _logger.debug('test')
         _logger.debug(voucher_id)
 
+        # Equivalent to workflow proform
+        self.pool.get('account.voucher').write(cr, uid, [voucher_id], {'state':'draft'}, context=context)
+
+        # Need to create basic account.voucher.line according to the type of invoice need to check stuff ...
+        double_check = 0
         for move_line in invoice.move_id.line_id:
-            line_data = {
-                'voucher_id' : voucher_id,
-                'move_line_id' : move_line.id,
-                'account_id' : account.id,
-                'partner_id' : partner_id,
-                'amount': abs(move_line.credit) or abs(move_line.debit),
-                'type': invoice.type in ('out_invoice','out_refund') and 'dr' or 'cr',
-            }
-            _logger.debug('line_data')
-            _logger.debug(line_data)
+            if move_line.credit > 0.0:
+                line_data = {
+                    'name': invoice.number,
+                    'voucher_id' : voucher_id,
+                    'move_line_id' : move_line.id,
+                    'account_id' : invoice.account_id.id,
+                    'partner_id' : partner_id,
+                    'amount_unreconciled': abs(move_line.credit) or abs(move_line.debit),
+                    'amount_original': abs(move_line.credit) or abs(move_line.debit),
+                    'amount': abs(move_line.credit) or abs(move_line.debit),
+                    'type': 'dr',
+                }
+                _logger.debug('line_data')
+                _logger.debug(line_data)
 
-            line_id = self.pool.get('account.voucher.line').create(cr, uid, line_data, context=context)
+                line_id = self.pool.get('account.voucher.line').create(cr, uid, line_data, context=context)
+                double_check += 1
 
-            _logger.debug('testline')
-            _logger.debug(line_id)
+        # Cautious check to see if we did ok
+        if double_check == 0:
+            _logger.warning(invoice)
+            _logger.warning(voucher_id)
+            raise osv.except_osv(_("Warning"), _("I did not create any voucher line"))
+        elif double_check > 1:
+            _logger.warning(invoice)
+            _logger.warning(voucher_id)
+            raise osv.except_osv(_("Warning"), _("I created multiple voucher line ??"))
 
-        voucher = self.pool.get('account.voucher').button_proforma_voucher(cr, uid, [voucher_id], context=context)
-        _logger.debug('test2')
-        _logger.debug(voucher)
 
+        # Where the magic happen
+        self.pool.get('account.voucher').button_proforma_voucher(cr, uid, [voucher_id], context=context)
 
+        # Final step mark the correct account_move _line
+        voucher = self.pool.get('account.voucher').browse(cr, uid, voucher_id, context=context)
 
-        #vals = { 'account_move_line_id' : ids[0] }
-        #self.pool.get('linxo.transaction').write(cr, uid, [transaction_id], vals, context=context)
+        search_args = [
+            ('move_id', '=', voucher.move_id.id),
+            ('account_id', '=', account.id),
+        ]
+        move_line_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
+        if len(move_line_ids) != 1:
+            _logger.warning('Weird, we should have one')
+            _logger.warning(move_line_ids)
+        else:
+            vals = { 'account_move_line_id' : move_line_ids[0] }
+            self.pool.get('linxo.transaction').write(cr, uid, [transaction_id], vals, context=context)
 
         return True
-account_move_line()
+account_invoice()
