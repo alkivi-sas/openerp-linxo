@@ -72,7 +72,7 @@
             <field name="type">tree</field>
             <field name="arch" type="xml">
                 <tree string="Linxo Transactions" create="false">
-                    <button string="Auto Reconcile" type="object" name="do_reconciliation" icon="STOCK_EXECUTE"/>
+                    <button string="Launch Wizard" type="object" name="open_wizard" icon="STOCK_EXECUTE"/>
                     <field name="date" readonly="1" />
                     <field name="label" readonly="1" />
                     <field name="notes" readonly="1" />
