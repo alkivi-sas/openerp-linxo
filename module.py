@@ -1061,23 +1061,43 @@ class account_invoice(osv.osv):
         # Need to create basic account.voucher.line according to the type of invoice need to check stuff ...
         double_check = 0
         for move_line in invoice.move_id.line_id:
-            if move_line.credit > 0.0:
-                line_data = {
-                    'name': invoice.number,
-                    'voucher_id' : voucher_id,
-                    'move_line_id' : move_line.id,
-                    'account_id' : invoice.account_id.id,
-                    'partner_id' : partner_id,
-                    'amount_unreconciled': abs(move_line.credit) or abs(move_line.debit),
-                    'amount_original': abs(move_line.credit) or abs(move_line.debit),
-                    'amount': abs(move_line.credit) or abs(move_line.debit),
-                    'type': 'dr',
-                }
-                _logger.debug('line_data')
-                _logger.debug(line_data)
+            # According to invoice type 
+            if invoice.type in ('out_invoice','out_refund'):
+                if move_line.debit > 0.0:
+                    line_data = {
+                        'name': invoice.number,
+                        'voucher_id' : voucher_id,
+                        'move_line_id' : move_line.id,
+                        'account_id' : invoice.account_id.id,
+                        'partner_id' : partner_id,
+                        'amount_unreconciled': abs(move_line.debit),
+                        'amount_original': abs(move_line.debit),
+                        'amount': abs(move_line.debit),
+                        'type': 'cr',
+                    }
+                    _logger.debug('line_data')
+                    _logger.debug(line_data)
 
-                line_id = self.pool.get('account.voucher.line').create(cr, uid, line_data, context=context)
-                double_check += 1
+                    line_id = self.pool.get('account.voucher.line').create(cr, uid, line_data, context=context)
+                    double_check += 1
+            else:
+                if move_line.credit > 0.0:
+                    line_data = {
+                        'name': invoice.number,
+                        'voucher_id' : voucher_id,
+                        'move_line_id' : move_line.id,
+                        'account_id' : invoice.account_id.id,
+                        'partner_id' : partner_id,
+                        'amount_unreconciled': abs(move_line.credit),
+                        'amount_original': abs(move_line.credit),
+                        'amount': abs(move_line.credit),
+                        'type': 'dr',
+                    }
+                    _logger.debug('line_data')
+                    _logger.debug(line_data)
+
+                    line_id = self.pool.get('account.voucher.line').create(cr, uid, line_data, context=context)
+                    double_check += 1
 
         # Cautious check to see if we did ok
         if double_check == 0:
