@@ -248,5 +248,20 @@
             <field name="context">{'transaction_id': active_id }</field>
         </record>
 
+        <!-- Cron task daily -->
+        <record model="ir.cron" id="ir_cron_linxo_sync" forcecreate="True">
+            <field name="name">Fetch latest Linxo Transaction</field>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">6</field>
+            <field name="interval_type">hours</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+            <field name="model">linxo.sync</field>
+            <field name="function">do_sync</field>
+            <field eval="'(None,)'" name="args" />
+        </record>
+        
+
     </data>
 </openerp>
