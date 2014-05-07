@@ -1028,8 +1028,6 @@ class account_invoice(osv.osv):
         transaction_id = context['transaction_id']
         transaction = self.pool.get('linxo.transaction').browse(cr, uid, transaction_id, context=context)
 
-        _logger.debug('I should mark this invoice has paid, and then do crazy stuff')
-
         invoice = self.browse(cr, uid, ids[0], context=context)
         move = invoice.move_id
         
@@ -1112,6 +1110,7 @@ class account_invoice(osv.osv):
 
         # Where the magic happen
         self.pool.get('account.voucher').button_proforma_voucher(cr, uid, [voucher_id], context=context)
+        _logger.info('Invoice was mark as paid')
 
         # Final step mark the correct account_move _line
         voucher = self.pool.get('account.voucher').browse(cr, uid, voucher_id, context=context)
