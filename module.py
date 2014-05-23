@@ -879,10 +879,18 @@ class linxo_reconcile(osv.osv_memory):
         _logger.debug('Search criteria for account.move.line')
         _logger.debug(search_args)
 
-        account_ids = self.pool.get('account.move.line').search(cr, uid, search_args, context=context)
+        move_line_pool = self.pool.get('account.move.line')
+        account_move_line_ids = move_line_pool.search(cr, uid, search_args, context=context)
 
-        if account_ids:
-            result[wizard_id] = account_ids
+        final_ids = []
+        if account_move_line_ids:
+            for line_id in account_move_line_ids:
+                account_move_line = move_line_pool.browse(cr, uid, line_id, context=context)
+                if account_move_line.move_id.state != 'posted':
+                    final_ids.append(line_id)
+
+        if final_ids:
+            result[wizard_id] = final_ids
         else:
             #res[i] must be set to False and not to None because of XML:RPC
             # "cannot marshal None unless allow_none is enabled"
