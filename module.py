@@ -891,6 +891,8 @@ class linxo_reconcile(osv.osv_memory):
 
         if final_ids:
             result[wizard_id] = final_ids
+        elif account_move_line_ids:
+            result[wizard_id] = account_move_line_ids
         else:
             #res[i] must be set to False and not to None because of XML:RPC
             # "cannot marshal None unless allow_none is enabled"

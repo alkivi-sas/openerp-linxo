@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 { 
    'name': 'Linxo', 
-   'version': '1.0.4', 
+   'version': '1.0.5', 
    'summary': 'Bank reconciliation using Linxo',
    'description': """
 Import bank statement from Linxo and perform automatic reconciliation.
