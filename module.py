@@ -1089,7 +1089,8 @@ class account_invoice(osv.osv):
                     line_id = self.pool.get('account.voucher.line').create(cr, uid, line_data, context=context)
                     double_check += 1
             else:
-                if move_line.credit > 0.0:
+                # In case of invoice with negative amount ...
+                if move_line.credit > 0.0 and move_line.credit != move_line.tax_amount:
                     line_data = {
                         'name': invoice.number,
                         'voucher_id' : voucher_id,
