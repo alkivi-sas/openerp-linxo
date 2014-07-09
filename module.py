@@ -225,19 +225,22 @@ class linxo_sync(osv.osv_memory):
             _logger.debug('We fetched more than the max, stopping here')
             return False
 
-        # Look in database lowest id (older transaction)
-        sorted_transactions = sorted(transactions['transactions'], key=lambda transaction: transaction['id'])
-        lowest_id = int(sorted_transactions[0]['id'])
-        _logger.debug('lowest_id so far is %d' % lowest_id)
-
-        # Do we have a linxo.transaction with that id ?
-        transaction_obj = self.pool.get('linxo.transaction')
-        transactions_ids = transaction_obj.search(cr, uid, [('linxo_id', '=', lowest_id)], context=context)
-
-        if transactions_ids:
-            return False
-        else:
+        if 'complete_sync' in context:
             return True
+        else:
+            # Look in database lowest id (older transaction)
+            sorted_transactions = sorted(transactions['transactions'], key=lambda transaction: transaction['id'])
+            lowest_id = int(sorted_transactions[0]['id'])
+            _logger.debug('lowest_id so far is %d' % lowest_id)
+
+            # Do we have a linxo.transaction with that id ?
+            transaction_obj = self.pool.get('linxo.transaction')
+            transactions_ids = transaction_obj.search(cr, uid, [('linxo_id', '=', lowest_id)], context=context)
+
+            if transactions_ids:
+                return False
+            else:
+                return True
 
 
     def _handle_bank_transaction(self, cr, uid, ids, context, transaction):

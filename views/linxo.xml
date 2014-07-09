@@ -181,6 +181,7 @@
                         <field name='transaction_updated' readonly="1"/>
                         <field name='transaction_created' readonly="1"/>
                     </group>
+                    <button string="Launch Complete Sync" type="object" name="do_sync" class="oe_highlight" context="{'complete_sync':1}"/>
                     <button string="Launch Account Sync" type="object" name="do_sync" class="oe_highlight" context="{'account_only':1}"/>
                     <button string="Launch Manual Sync" type="object" name="do_sync" class="oe_highlight"/>
                 </form>
