@@ -226,6 +226,7 @@ class linxo_sync(osv.osv_memory):
             return False
 
         if 'complete_sync' in context:
+            _logger.debug('Complete sync, gogogogo')
             return True
         else:
             # Look in database lowest id (older transaction)
