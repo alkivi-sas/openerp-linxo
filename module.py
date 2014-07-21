@@ -725,11 +725,13 @@ class linxo_transaction(osv.osv):
                 # Check that balance is 0 and amount match
                 if account_move.balance != 0.0:
                     if do_raise:
+                        _logger.debug('account_move balance is %s' % account_move.balance)
                         raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move is not balance"))
                     else:
                         continue
                 if account_move.amount != abs(transaction.amount):
                     if do_raise:
+                        _logger.debug('account_move amount vs transaction amount : %s vs %s' % (account_move.amount, transaction.amount))
                         raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move amount differs from the transaction"))
                     else:
                         continue
@@ -1047,13 +1049,24 @@ class account_invoice(osv.osv):
         
         # First part, create voucher
         account = transaction.journal_id.default_credit_account_id or transaction.journal_id.default_debit_account_id
-        period_id = self.pool.get('account.voucher')._get_period(cr, uid)
+
+        # Fetch correct period_id according to transaction date
+        date = transaction.date
+        search_args = [('date_start', '<=', date), ('date_stop', '>=', date)]
+        period_ids = self.pool.get('account.period').search(cr, uid, search_args, context=context)
+        if not period_ids:
+            raise osv.except_osv(_("Warning"), _("Unable to find a period for date of transaction %s" % date))
+        elif len(period_ids) > 1:
+            raise osv.except_osv(_("Warning"), _("Found mulitple period for date of transaction %s" % date))
+        period_id = period_ids[0]
+
         partner_id = self.pool.get('res.partner')._find_accounting_partner(invoice.partner_id).id,
 
         voucher_data = {
             'partner_id': partner_id,
             'amount': abs(transaction.amount),
             'journal_id': transaction.journal_id.id,
+            'date': date,
             'period_id': period_id,
             'account_id': account.id,
             'type': invoice.type in ('out_invoice','out_refund') and 'receipt' or 'payment',
