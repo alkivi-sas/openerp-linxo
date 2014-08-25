@@ -1052,7 +1052,7 @@ class account_invoice(osv.osv):
 
         # Fetch correct period_id according to transaction date
         date = transaction.date
-        search_args = [('date_start', '<=', date), ('date_stop', '>=', date)]
+        search_args = [('date_start', '<=', date), ('date_stop', '>=', date), ('special', '=', False)]
         period_ids = self.pool.get('account.period').search(cr, uid, search_args, context=context)
         if not period_ids:
             raise osv.except_osv(_("Warning"), _("Unable to find a period for date of transaction %s" % date))
