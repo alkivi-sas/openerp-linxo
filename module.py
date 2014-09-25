@@ -711,6 +711,7 @@ class linxo_transaction(osv.osv):
 
         obj_move = self.pool.get('account.move')
         obj_invoice = self.pool.get('account.invoice')
+        obj_voucher = self.pool.get('account.voucher')
 
         do_raise = True
         if 'batch' in context:
@@ -719,8 +720,18 @@ class linxo_transaction(osv.osv):
         for transaction in transactions:
             if transaction.account_move_line_id:
                 account_move_line = transaction.account_move_line_id
-
                 account_move = account_move_line.move_id
+
+                # Find a voucher
+                search_args = [('move_id', '=', account_move.id)]
+                account_voucher_ids  = obj_voucher.search(cr, uid, search_args, context=context)
+                account_voucher = None
+                if not account_voucher_ids:
+                    continue
+                elif len(account_voucher_ids) > 1:
+                    continue
+                else:
+                    account_voucher = obj_voucher.browse(cr, uid, account_voucher_ids[0], context=context)
 
                 # Check that balance is 0 and amount match
                 if account_move.balance != 0.0:
@@ -729,10 +740,14 @@ class linxo_transaction(osv.osv):
                         raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move is not balance"))
                     else:
                         continue
-                if account_move.amount != abs(transaction.amount):
-                    if do_raise:
-                        _logger.debug('account_move amount vs transaction amount : %s vs %s' % (account_move.amount, transaction.amount))
-                        raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move amount differs from the transaction"))
+                if account_voucher.amount != abs(transaction.amount):
+                    raise_test = True
+                    if account_voucher and account_voucher.amount == abs(transaction.amount):
+                        raise_test = False
+
+                    if do_raise and raise_test:
+                        _logger.debug('account_voucher amount vs transaction amount : %s vs %s' % (account_voucher.amount, transaction.amount))
+                        raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated voucher amount differs from the transaction"))
                     else:
                         continue
 
