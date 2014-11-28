@@ -1101,6 +1101,10 @@ class account_invoice(osv.osv):
         # Need to create basic account.voucher.line according to the type of invoice need to check stuff ...
         double_check = 0
         for move_line in invoice.move_id.line_id:
+            if move_line.product_id:
+                _logger.debug('Skipping move_line %d because got product_id and we dont want that' % move_line.id)
+                continue
+
             # According to invoice type 
             if invoice.type in ('out_invoice','out_refund'):
                 if move_line.debit > 0.0:
