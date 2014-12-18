@@ -1,10 +1,6 @@
 <?xml version="1.0"?>
 <openerp>
     <data>
-        <!-- Top menu item -->
-        <menuitem name="Tools" id="base.menu_tools" sequence="120" groups="account.group_account_user"/>
-
-
         <!-- Accounts Search View-->
         <record model="ir.ui.view" id="view_linxo_account_search">
             <field name="name">linxo.account.search</field>
@@ -46,8 +42,8 @@
             <field name="context">{"search_default_journal_id":False}</field>
         </record>
 
-        <menuitem name="Linxo" parent="base.menu_tools" id="base.menu_linxo_root" sequence="10" groups="account.group_account_user" />
-        <menuitem name="Bank Accounts" parent="base.menu_linxo_root" id="menu_linxo_accounts" action="action_linxo_account" sequence="10"/>
+        <menuitem name="Linxo" parent="account.menu_finance" id="menu_linxo_root" sequence="10" groups="account.group_account_user" />
+        <menuitem name="Bank Accounts" parent="menu_linxo_root" id="menu_linxo_accounts" action="action_linxo_account" sequence="10"/>
 
 
         <!-- Transaction Search View-->
@@ -146,7 +142,7 @@
             <field name="search_view_id" ref="view_linxo_transaction_search"/>
             <field name="context">{"search_default_unreconciled":1}</field>
         </record>
-        <menuitem name="Transactions" parent="base.menu_linxo_root" id="menu_linxo_transaction" action="action_linxo_transaction" sequence="11" />
+        <menuitem name="Transactions" parent="menu_linxo_root" id="menu_linxo_transaction" action="action_linxo_transaction" sequence="11" />
 
         <record model="ir.ui.view" id="view_move_line_search">
             <field name="name">account.move.search</field>
@@ -165,7 +161,7 @@
             <field name="search_view_id" ref="view_move_line_search"/>
             <field name="context">{"search_default_unreconciled":1}</field>
         </record>
-        <menuitem name="Moves" parent="base.menu_linxo_root" id="menu_move_line" action="action_move_line" sequence="12" />
+        <menuitem name="Moves" parent="menu_linxo_root" id="menu_move_line" action="action_move_line" sequence="12" />
 
         <!-- Sync Form View -->
         <record model="ir.ui.view" id="view_linxo_sync_form">
@@ -195,7 +191,7 @@
             <field name="view_type">form</field>
             <field name="view_mode">form</field>
         </record>
-        <menuitem name="Manual Sync" parent="base.menu_linxo_root" id="menu_linxo_sync" action="action_linxo_sync" sequence="13" />
+        <menuitem name="Manual Sync" parent="menu_linxo_root" id="menu_linxo_sync" action="action_linxo_sync" sequence="13" />
 
 
         <!-- Reconcile Wizard -->

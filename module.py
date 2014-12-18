@@ -151,23 +151,26 @@ class linxo_sync(osv.osv_memory):
         self.session.headers.update(_get_headers())
 
         # Statistics
-        self.account_treated = 0
-        self.account_updated = 0
-        self.account_created = 0
-        self.transaction_treated = 0
-        self.transaction_updated = 0
-        self.transaction_created = 0
+        data = {
+            'account_treated': 0,
+            'account_updated': 0,
+            'account_created': 0,
+            'transaction_treated': 0,
+            'transaction_updated': 0,
+            'transaction_created': 0,
+        }
 
         # First pass, create or update bankAccount in our database
         bank_accounts = self._get_bank_accounts()
         for account_type in ['Checkings']:
             for account in bank_accounts['accountsByType'][account_type]:
                 result = self._handle_bank_account(cr, uid, ids, context, account)
+
                 if result == 1:
-                    self.account_created += 1
+                    data['account_created'] += 1
                 elif result == 2:
-                    self.account_updated += 1
-                self.account_treated += 1
+                    data['account_updated'] += 1
+                data['account_treated'] += 1
 
         # Stop here : init sync
         if 'account_only' in context:
@@ -201,14 +204,11 @@ class linxo_sync(osv.osv_memory):
                     self._handle_bank_transaction(cr, uid, ids, context, transaction)
 
                     if result == 1:
-                        self.transaction_created += 1
+                        data['transaction_created'] += 1
                     elif result == 2:
-                        self.transaction_updated += 1
-                    self.transaction_treated += 1
+                        data['transaction_updated'] += 1
+                    data['transaction_treated'] += 1
 
-        data = {}
-        for key in self._defaults:
-            data[key] = getattr(self, key)
 
         self.pool.get('linxo.sync').write(cr, uid, ids, data, context=context)
         return self
@@ -893,9 +893,9 @@ class linxo_reconcile(osv.osv_memory):
         ]
 
         if wizard.credit:
-            search_args.append(('credit', '=', wizard.credit))
+            search_args.append(('credit', '=', round(wizard.credit,3)))
         else:
-            search_args.append(('debit', '=', wizard.debit))
+            search_args.append(('debit', '=', round(wizard.debit,3)))
 
         _logger.debug('Search criteria for account.move.line')
         _logger.debug(search_args)
@@ -940,9 +940,9 @@ class linxo_reconcile(osv.osv_memory):
         ]
 
         if wizard.credit:
-            search_args.append(('amount_total', '=', wizard.credit))
+            search_args.append(('amount_total', '=', round(wizard.credit,3)))
         else:
-            search_args.append(('amount_total', '=', wizard.debit))
+            search_args.append(('amount_total', '=', round(wizard.debit,3)))
 
         _logger.debug('Search criteria for account.invoice')
         _logger.debug(search_args)
