@@ -108,7 +108,7 @@ class linxo_sync(osv.osv_memory):
 
     def do_reconciliation(self, cr, uid, ids, context=None):
         transaction_obj = self.pool.get('linxo.transaction')
-        search_args = [('account_move_line_id', '=', None)]
+        search_args = [('account_move_line_id', '=', None), ('reconciled', '=', False)]
         transactions_ids = transaction_obj.search(cr, uid, search_args, context=context)
         if transactions_ids:
             transaction_obj.search_reconciliation(cr, uid, transactions_ids, context=context)
@@ -647,6 +647,7 @@ class linxo_transaction(osv.osv):
         'budget_date': fields.date('Budget Date', required=True),
         'date': fields.date('Date', required=True),
         'category' : fields.integer('Category'),
+        'reconciled': fields.boolean('Reconciled'),
         'label': fields.char('Label', size=255, required=True),
         'notes': fields.char('Notes', size=255, required=True),
         'city' : fields.char('City', size=255),
@@ -656,6 +657,10 @@ class linxo_transaction(osv.osv):
             'account_id', 'journal_id', type="many2one",
             relation="account.journal", string="Bank Journal",
             store=False),
+    }
+
+    _defaults = {
+        'reconciled': False,
     }
 
     _sql_constraints = [
@@ -817,7 +822,7 @@ class linxo_transaction(osv.osv):
                 _logger.debug('Find more than one account.move.line')
             else:
 
-                vals = { 'account_move_line_id' : move_line_ids[0] }
+                vals = { 'account_move_line_id' : move_line_ids[0], 'reconciled': True }
                 self.write(cr, uid, [transaction.id], vals, context=context)
 
 
@@ -831,6 +836,24 @@ class linxo_transaction(osv.osv):
         self.apply_reconciliation(cr, uid, ids, context=context)
         return res
 
+
+    def mutual_reconciliation(self, cr, uid, ids, context=None):
+        """Used when canceling one transaction with another one
+        """
+        if not context:
+            context = {}
+
+        if not 'transaction_id' in context:
+            _logger.warning('do_reconciliation problem, context is fucked up')
+            _logger.warning(context)
+            raise osv.except_osv(_("Warning"), _("I dont have a transaction associated, this is weird."))
+
+        transaction_id = context['transaction_id']
+        transactions = self.browse(cr, uid, [ids[0], transaction_id], context=context)
+        for transaction_id in [context['transaction_id'], ids[0]]:
+            _logger.debug('Going to apply reconciliation on transaction id %d' % transaction_id)
+            vals = { 'reconciled' : True }
+            self.write(cr, uid, [transaction_id], vals, context=context)
 
     def do_reconciliation(self, cr, uid, ids, context=None):
         """Perform reconciliation on all unmark transaction
@@ -958,14 +981,47 @@ class linxo_reconcile(osv.osv_memory):
 
         return result
 
+    def _get_transactions(self, cr, uid, ids, field_name, arg, context):
+        """Will return a list of ids of unpaid account.invoice, matching amount 
+        """
+        result = {}
+
+        wizard = self.browse(cr, uid, ids, context=context)[0]
+        wizard_id = ids[0]
+
+        transaction = wizard.transaction_id
+        if not transaction:
+            return result
+
+        _logger.debug('Got transaction %d' % transaction.id)
+
+
+        search_args = [('id', '!=', transaction.id), ('reconciled', '=', False)]
+        if wizard.credit:
+            search_args.append(('amount', '=', wizard.credit))
+        else:
+            search_args.append(('amount', '=', -wizard.debit))
+
+        transaction_ids = self.pool.get('linxo.transaction').search(cr, uid, search_args, context=context)
+
+        if transaction_ids:
+            result[wizard_id] = transaction_ids
+        else:
+            #res[i] must be set to False and not to None because of XML:RPC
+            # "cannot marshal None unless allow_none is enabled"
+            result[wizard_id] = False
+
+        return result
+
 
     _columns = {
         'date': fields.date('Date'),
         'debit': fields.float('Debit', digits_compute=dp.get_precision('Account')),
         'credit': fields.float('Credit', digits_compute=dp.get_precision('Account')),
         'transaction_id': fields.many2one('linxo.transaction', 'Original Transaction'),
-        'candidates' : fields.function(_get_candidates, type='one2many', obj='account.move.line', method=True, string='Matching Transactions'),
-        'invoices' : fields.function(_get_invoices, type='one2many', obj='account.invoice', method=True, string='Matching Unpaid Transaction'),
+        'candidates' : fields.function(_get_candidates, type='one2many', obj='account.move.line', method=True, string='Matching Account Move Line'),
+        'invoices' : fields.function(_get_invoices, type='one2many', obj='account.invoice', method=True, string='Matching Unpaid Invoice'),
+        'transactions' : fields.function(_get_transactions, type='one2many', obj='linxo.transaction', method=True, string='Matching Reverse Transactions'),
     }
 
     def find_candidates(self, cr, uid, ids, context=None):
@@ -1011,7 +1067,7 @@ class account_move_line(osv.osv):
         res = {}
         for i in ids:
             move_obj = self.pool.get('linxo.transaction')
-            search = [('account_move_line_id', '=', i)]
+            search = [('account_move_line_id', '=', i), ('reconciled', '=', False)]
             test_ids = move_obj.search(cr, uid, search, context=context)
             if test_ids:
                 res[i] = False
@@ -1038,7 +1094,7 @@ class account_move_line(osv.osv):
             raise osv.except_osv(_("Warning"), _("I dont have a transaction associated, this is weird."))
 
         transaction_id = context['transaction_id']
-        vals = { 'account_move_line_id' : ids[0] }
+        vals = { 'account_move_line_id' : ids[0], 'reconciled' : True }
         self.pool.get('linxo.transaction').write(cr, uid, [transaction_id], vals, context=context)
 
         return True
@@ -1171,7 +1227,7 @@ class account_invoice(osv.osv):
             _logger.warning('Weird, we should have one')
             _logger.warning(move_line_ids)
         else:
-            vals = { 'account_move_line_id' : move_line_ids[0] }
+            vals = { 'account_move_line_id' : move_line_ids[0], 'reconciled': True }
             self.pool.get('linxo.transaction').write(cr, uid, [transaction_id], vals, context=context)
 
         return True

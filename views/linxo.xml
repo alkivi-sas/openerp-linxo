@@ -56,7 +56,7 @@
                     <field name="notes" string="Extra Notes"/>
                     <field name="amount" string="Amount"/>
                     <field name="date" string="Date"/>
-                    <filter string="Unreconciled" name="unreconciled" domain="[('account_move_line_id','=',False)]"/>
+                    <filter string="Unreconciled" name="unreconciled" domain="[('reconciled','=',False)]"/>
                 </search>
             </field>
         </record>
@@ -74,6 +74,7 @@
                     <field name="notes" readonly="1" />
                     <field name="journal_id" readonly="1"/>
                     <field name="amount" readonly="1" />
+                    <field name="reconciled" readonly="1" />
                     <field name="account_move_line_id" />
                 </tree>
             </field>
@@ -226,6 +227,16 @@
                             <field name="state" readonly="1" />
                             <field name="partner_id" readonly="1" />
                             <button string="I'm the correct one" type="object" name="do_reconciliation" icon="STOCK_EXECUTE"/>
+                        </tree>
+                    </field>
+                    <separator string="Matching Same Transaction" colspan="4"/>
+                    <field name='transactions' context="{'transaction_id': transaction_id}">
+                        <tree>
+                            <field name="date" readonly="1" />
+                            <field name="amount" readonly="1" />
+                            <field name="label" readonly="1" />
+                            <field name="notes" readonly="1" />
+                            <button string="I'm the correct one" type="object" name="mutual_reconciliation" icon="STOCK_EXECUTE"/>
                         </tree>
                     </field>
                    <footer>
