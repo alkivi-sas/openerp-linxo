@@ -963,9 +963,11 @@ class linxo_reconcile(osv.osv_memory):
         ]
 
         if wizard.credit:
-            search_args.append(('amount_total', '=', round(wizard.credit,3)))
+            search_args.append(('amount_total', '>=', round(wizard.credit,3)-0.0001))
+            search_args.append(('amount_total', '<=', round(wizard.credit,3)+0.0001))
         else:
-            search_args.append(('amount_total', '=', round(wizard.debit,3)))
+            search_args.append(('amount_total', '>=', round(wizard.debit,3)-0.0001))
+            search_args.append(('amount_total', '<=', round(wizard.debit,3)+0.0001))
 
         _logger.debug('Search criteria for account.invoice')
         _logger.debug(search_args)
