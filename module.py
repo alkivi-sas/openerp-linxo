@@ -916,9 +916,11 @@ class linxo_reconcile(osv.osv_memory):
         ]
 
         if wizard.credit:
-            search_args.append(('credit', '=', round(wizard.credit,3)))
+            search_args.append(('credit', '<=', round(wizard.credit,3)+0.0001))
+            search_args.append(('credit', '>=', round(wizard.credit,3)-0.0001))
         else:
-            search_args.append(('debit', '=', round(wizard.debit,3)))
+            search_args.append(('debit', '<=', round(wizard.debit,3)+0.0001))
+            search_args.append(('debit', '>=', round(wizard.debit,3)-0.0001))
 
         _logger.debug('Search criteria for account.move.line')
         _logger.debug(search_args)
