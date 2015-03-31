@@ -643,6 +643,8 @@ class linxo_transaction(osv.osv):
             'linxo.account', 'Linxo Account', ondelete='cascade'),
         'account_move_line_id': fields.many2one(
             'account.move.line', 'Account Move Line'),
+        'invoice_id': fields.many2one(
+            'account.invoice', 'Invoice'),
         'amount': fields.float('Amount', digits_compute=dp.get_precision('Account'), required=True),
         'budget_date': fields.date('Budget Date', required=True),
         'date': fields.date('Date', required=True),
@@ -1232,7 +1234,7 @@ class account_invoice(osv.osv):
             _logger.warning('Weird, we should have one')
             _logger.warning(move_line_ids)
         else:
-            vals = { 'account_move_line_id' : move_line_ids[0], 'reconciled': True }
+            vals = { 'account_move_line_id' : move_line_ids[0], 'reconciled': True, 'invoice_id': invoice.id }
             self.pool.get('linxo.transaction').write(cr, uid, [transaction_id], vals, context=context)
 
         return True
