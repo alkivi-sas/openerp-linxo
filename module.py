@@ -643,8 +643,8 @@ class linxo_transaction(osv.osv):
             'linxo.account', 'Linxo Account', ondelete='cascade'),
         'account_move_line_id': fields.many2one(
             'account.move.line', 'Account Move Line'),
-        'invoice_id': fields.many2one(
-            'account.invoice', 'Invoice'),
+        #'invoice_id': fields.many2one(
+        #    'account.invoice', 'Invoice'),
         'amount': fields.float('Amount', digits_compute=dp.get_precision('Account'), required=True),
         'budget_date': fields.date('Budget Date', required=True),
         'date': fields.date('Date', required=True),

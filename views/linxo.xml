@@ -75,7 +75,7 @@
                     <field name="journal_id" readonly="1"/>
                     <field name="amount" readonly="1" />
                     <field name="reconciled" readonly="1" />
-                    <field name="invoice_id" readonly="1" />
+                    <!-- <field name="invoice_id" readonly="1" /> -->
                     <field name="account_move_line_id" />
                 </tree>
             </field>
@@ -124,7 +124,7 @@
                         <field name="notes" readonly="1"/>
                         <field name="amount" readonly="1"/>
                         <field name="account_move_line_id"  attrs="{'invisible':[('account_move_line_id','=',False)]}" />
-                        <field name="invoice_id"  attrs="{'invisible':[('invoice_id','=',False)]}" />
+                        <!-- <field name="invoice_id"  attrs="{'invisible':[('invoice_id','=',False)]}" /> -->
                         <field name="journal_id" readonly="1"/>
                     </group>
                     <button name="open_wizard"
@@ -227,6 +227,7 @@
                             <field name="date_due" readonly="1" />
                             <field name="amount_total" readonly="1" />
                             <field name="state" readonly="1" />
+                            <field name="number" readonly="1" />
                             <field name="partner_id" readonly="1" />
                             <button string="I'm the correct one" type="object" name="do_reconciliation" icon="STOCK_EXECUTE"/>
                         </tree>
