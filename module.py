@@ -1169,7 +1169,7 @@ class account_invoice(osv.osv):
                 continue
 
             # According to invoice type 
-            if invoice.type in ('out_invoice','out_refund'):
+            if invoice.type in ('out_invoice','in_refund'):
                 if move_line.debit > 0.0:
                     line_data = {
                         'name': invoice.number,
