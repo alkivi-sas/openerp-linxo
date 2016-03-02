@@ -747,7 +747,7 @@ class linxo_transaction(osv.osv):
                         raise osv.except_osv(_("Error!"), _("Unable to apply reconciliation, the associated move is not balance"))
                     else:
                         continue
-                if account_voucher.amount != abs(transaction.amount):
+                if abs(account_voucher.amount) != abs(transaction.amount):
                     raise_test = True
                     if account_voucher and account_voucher.amount == abs(transaction.amount):
                         raise_test = False
@@ -1164,6 +1164,7 @@ class account_invoice(osv.osv):
         # Need to create basic account.voucher.line according to the type of invoice need to check stuff ...
         double_check = 0
         for move_line in invoice.move_id.line_id:
+            _logger.debug('Analysing move_line %d' % move_line.id)
             if move_line.product_id:
                 _logger.debug('Skipping move_line %d because got product_id and we dont want that' % move_line.id)
                 continue
