@@ -59,7 +59,8 @@ def check_changes(local, linxo, translation_dict, data_type=None):
                 new_value = format_linxo_data(linxo[linxo_key])
                 setattr(local, local_key, new_value)
                 if changes is None:
-                    _logger.debug('key {} differs {} {}'.format(local_key, value, linxo[linxo_key]))
+                    key_differs_string = u'key {} differs {} {}'.format(local_key, value, linxo[linxo_key]) 
+                    _logger.debug(key_differs_string)
                     return True
     return changes
 
