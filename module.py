@@ -163,7 +163,9 @@ class linxo_sync(osv.osv_memory):
 
         # First pass, create or update bankAccount in our database
         bank_accounts = self._get_bank_accounts()
-        for account_type in ['Checkings']:
+        _logger.debug('Linxo bank accounts :')
+        _logger.debug(bank_accounts)
+        for account_type in ['Checkings', 'CreditCard']:
             for account in bank_accounts['accountsByType'][account_type]:
                 result = self._handle_bank_account(cr, uid, ids, context, account)
 
@@ -178,7 +180,7 @@ class linxo_sync(osv.osv_memory):
             return self
 
         # Second pass, fetch operation from bankAccount
-        for account_type in ['Checkings']:
+        for account_type in ['Checkings', 'CreditCard']:
             for account in bank_accounts['accountsByType'][account_type]:
                 counter = 0
                 num_rows = 100
