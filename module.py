@@ -442,11 +442,11 @@ class linxo_sync(osv.osv_memory):
 
         _logger.debug('Going to fetch %s transaction for account %s starting at %s' % (
             num_rows, account['id'], start_row))
+        _logger.debug('Account : {}'.format(account))
 
         payload = {
             'actionName' : 'com.linxo.gwt.rpc.client.pfm.GetTransactionsAction',
             'action' : {
-                'accountType' : account['type'],
                 'accountId' : account['id'],
                 'labels' : [],
                 'categoryId' : None,
