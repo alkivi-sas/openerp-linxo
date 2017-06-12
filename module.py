@@ -167,6 +167,9 @@ class linxo_sync(osv.osv_memory):
         _logger.debug(bank_accounts)
         for account_type in ['Checkings', 'CreditCard']:
             for account in bank_accounts['accountsByType'][account_type]:
+                # Fix type
+                if 'type' not in account_type:
+                    account['type'] = account_type
                 result = self._handle_bank_account(cr, uid, ids, context, account)
 
                 if result == 1:
