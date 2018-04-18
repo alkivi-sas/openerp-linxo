@@ -7,6 +7,7 @@ import json
 import re
 import datetime
 import requests
+from linxo import Client as ApiClient
 
 from openerp import pooler, tools
 from openerp import SUPERUSER_ID
@@ -126,30 +127,25 @@ class linxo_sync(osv.osv_memory):
         # batch context key will be use not to raise exeption
         context['batch'] = True
 
-        # Move this to overrided __init__ ?
-        self.base_domain = 'wwws.linxo.com'
-        self.verify_ssl = True
-
-        self.url = 'https://%s/json' % self.base_domain
-        self.logged_in = False
-
         ir_values = self.pool.get('ir.values')
 
-        for param_name in ['api_secret', 'api_key', 'username', 'password']:
+        for param_name in ['refresh_token', 'client_id', 'client_secret']:
             value = ir_values.get_default(cr, uid, 'linxo.config', param_name)
             setattr(self, param_name, value)
 
-        self.session = requests.Session()
+        def token_updater(token):
+            """Save the new token in ir_values."""
+            _logger.debug('new refresh_token {0}'.format(token.get('refresh_token')))
+            ir_values = self.pool.get('ir.values')
+            ir_values.set_default(cr, SUPERUSER_ID, 'linxo.config', 'refresh_token', token.get('refresh_token'))
+            self.refresh_token=token.get('refresh_token')
+            self.client.set_token(token)
 
-        # Generate nonce 
-        import random
-        self.nonce = '%030x' % random.randrange(16**30)
-
-        # Set cookies
-        self._set_cookies()
-
-        # Set headers
-        self.session.headers.update(_get_headers())
+        self.client = ApiClient(endpoint='prod',
+                                client_id=self.client_id, 
+                                token_updater=token_updater,
+                                client_secret=self.client_secret,
+                                refresh_token=self.refresh_token)
 
         # Statistics
         data = {
@@ -162,93 +158,49 @@ class linxo_sync(osv.osv_memory):
         }
 
         # First pass, create or update bankAccount in our database
-        bank_accounts = self._get_bank_accounts()
+        params = {'status': 'ACTIVE'}
+        url = '/accounts'
+        bank_accounts = self.client.get(url, **params)
         _logger.debug('Linxo bank accounts :')
         _logger.debug(bank_accounts)
-        for account_type in ['Checkings', 'CreditCard']:
-            for account in bank_accounts['accountsByType'][account_type]:
-                # Fix type
-                if 'type' not in account_type:
-                    account['type'] = account_type
-                result = self._handle_bank_account(cr, uid, ids, context, account)
 
-                if result == 1:
-                    data['account_created'] += 1
-                elif result == 2:
-                    data['account_updated'] += 1
-                data['account_treated'] += 1
+        types_to_keep = ['CREDIT_CARD', 'CHECKINGS']
+        for account in bank_accounts:
+            if account['type'] not in types_to_keep:
+                continue
+
+            result = self._handle_bank_account(cr, uid, ids, context, account)
+
+            if result == 1:
+                data['account_created'] += 1
+            elif result == 2:
+                data['account_updated'] += 1
+            data['account_treated'] += 1
 
         # Stop here : init sync
         if 'account_only' in context:
+            self.pool.get('linxo.sync').write(cr, uid, ids, data, context=context)
             return self
 
         # Second pass, fetch operation from bankAccount
-        for account_type in ['Checkings', 'CreditCard']:
-            for account in bank_accounts['accountsByType'][account_type]:
-                counter = 0
-                num_rows = 100
-                transactions = self._get_transactions(account=account, start_row=num_rows * counter, num_rows=num_rows)
-                real_data = transactions['transactions']
+        for account in bank_accounts:
+            if account['type'] not in types_to_keep:
+                continue
 
-                # We might need to fetch more
-                fetch_more = self._need_to_fetch_more(cr, uid, ids, context, transactions, counter, num_rows)
-                while fetch_more:
-                    # Fetch next
-                    counter += 1
-                    temp_transactions = self._get_transactions(account=account, start_row=num_rows * counter, num_rows=num_rows)
-                    temp_data = temp_transactions['transactions']
+            transactions = self._get_transactions(account=account, step=100, cr=cr, uid=uid, context=context)
+            _logger.info('We fetched %d transactions' % len(transactions))
 
-                    # Merge data
-                    real_data.extend(temp_data)
+            for transaction in transactions:
+                self._handle_bank_transaction(cr, uid, ids, context, transaction)
 
-                    # Do we need to fethc more ?
-                    fetch_more = self._need_to_fetch_more(cr, uid, ids, context, temp_transactions, counter, num_rows)
-
-                _logger.info('We fetched %d transactions' % len(real_data))
-
-                for transaction in transactions['transactions']:
-                    self._handle_bank_transaction(cr, uid, ids, context, transaction)
-
-                    if result == 1:
-                        data['transaction_created'] += 1
-                    elif result == 2:
-                        data['transaction_updated'] += 1
-                    data['transaction_treated'] += 1
-
+                if result == 1:
+                    data['transaction_created'] += 1
+                elif result == 2:
+                    data['transaction_updated'] += 1
+                data['transaction_treated'] += 1
 
         self.pool.get('linxo.sync').write(cr, uid, ids, data, context=context)
         return self
-
-    def _need_to_fetch_more(self, cr, uid, ids, context,  transactions, counter, num_rows):
-        """Check if the lowest id according to the account is in database
-        If not, we need to check more rows
-        """
-
-        max_number = counter * num_rows + num_rows # round 0 : 100 data
-
-        # Already fetch enought data
-        if max_number > transactions['totalCount']:
-            _logger.debug('We fetched more than the max, stopping here')
-            return False
-
-        if 'complete_sync' in context:
-            _logger.debug('Complete sync, gogogogo')
-            return True
-        else:
-            # Look in database lowest id (older transaction)
-            sorted_transactions = sorted(transactions['transactions'], key=lambda transaction: transaction['id'])
-            lowest_id = int(sorted_transactions[0]['id'])
-            _logger.debug('lowest_id so far is %d' % lowest_id)
-
-            # Do we have a linxo.transaction with that id ?
-            transaction_obj = self.pool.get('linxo.transaction')
-            transactions_ids = transaction_obj.search(cr, uid, [('linxo_id', '=', lowest_id)], context=context)
-
-            if transactions_ids:
-                return False
-            else:
-                return True
-
 
     def _handle_bank_transaction(self, cr, uid, ids, context, transaction):
         """Replicate linxo transaction in our local database
@@ -268,7 +220,7 @@ class linxo_sync(osv.osv_memory):
 
         # Need to fetch associated account
         account_obj = self.pool.get('linxo.account')
-        account_ids = account_obj.search(cr, uid, [('linxo_id', '=', transaction['bankAccountId'])], context=context)
+        account_ids = account_obj.search(cr, uid, [('linxo_id', '=', transaction['account_id'])], context=context)
         if not account_ids:
             raise Exception('WTF ? We should have an account here')
         local_account = account_obj.browse(cr, uid, account_ids[0], context=context)
@@ -276,27 +228,15 @@ class linxo_sync(osv.osv_memory):
         def _get_translation_dict(data=None):
             if data is None:
                 return {
-                    'amount': 'amount',
                     'label': 'label',
                     'notes': 'notes',
-                    #'original_city': 'originalCity',
-                    'original_label': 'originalLabel',
-                    'original_third_party': 'originalThirdParty',}
-            elif data is 'int':
-                return {
-                    #'original_category': 'originalCategory',
-                    #'category_id': 'categoryId',
-                    'linxo_id' : 'id', }
-            if data is 'float':
-                return {
-                    'amount': 'amount',}
-            elif data == 'date':
-                return {
-                    'budget_date': 'budgetDate',
-                    'date': 'date',
-                    #'original_date_available': 'originalDateAvailable',
-                    #'original_date_initiated': 'originalDateInitiated',
                 }
+            elif data is 'int':
+                return {'linxo_id' : 'id'}
+            if data is 'float':
+                return {'amount': 'amount'}
+            elif data == 'date':
+                return {'date': 'date'}
             else:
                 raise Exception('wrong data {}'.format(data))
 
@@ -318,7 +258,6 @@ class linxo_sync(osv.osv_memory):
 
         if transaction_ids:
             local_transaction = transaction_obj.browse(cr, uid, transaction_ids[0], context=context)
-
 
             to_return = 0
             for data_type in _get_data_types():
@@ -365,7 +304,6 @@ class linxo_sync(osv.osv_memory):
             """
             if data is None:
                 return {
-                    'account_group_name' : 'accountGroupName',
                     'account_number': 'accountNumber',
                     'name': 'name',
                     'type': 'type' }
@@ -409,156 +347,45 @@ class linxo_sync(osv.osv_memory):
             _logger.debug('created new account %d' % account_id)
             return 1
 
-    def _get_bank_accounts(self):
-        """Fetch list of bank account on linxo
-        """
-        payload = {
-            'actionName' : 'com.linxo.gwt.rpc.client.pfm.GetBankAccountListAction',
-            'action' : {
-                'includeClosed' : False,
-            }
-        }
+    def _get_transactions(self, account, step=100, cr=None, uid=None, context=None):
+        """Fetch latest operation on linxo, specific to one account."""
 
-        if not self.logged_in:
-            self._login()
+        if not context:
+            context = {}
 
-        return self._perform_query(payload)
+	url = '/transactions'
+	page = 1
+	transactions = []
+	stop = False
 
-    def _get_transactions(self, *args, **kwargs):
-        """Fetch latest operation on linxo, specific to one account
-        """
+	while not stop:
+	    _logger.debug('Goint to fetch {0} transactions '.format(step) +
+                          'for account {0} (id {1}) '.format(account['name'], account['id']) +
+                          'starting at page {0}'.format(page))
+	    params = {'account_id': account['id'], 'page': page, 'limit': step}
+	    data = self.client.get(url, **params)
+	    transactions += data
+            page += 1
 
-        if 'account' in kwargs:
-            account = kwargs['account']
-        else:
-            raise MissingParameter('account')
+            # Conditions to stop max is reached
+            if len(data) < step:
+                _logger.debug('We fetched more than the max, stopping here')
+                stop = True
+            # Complete sync in progress
+            elif 'complete_sync' in context:
+                _logger.debug('Complete sync, gogogogo')
+                continue
+            # Look in database lowest id (older transaction)
+            else:
+                sorted_transactions = sorted(transactions, key=lambda transaction: transaction['id'])
+                lowest_id = int(sorted_transactions[0]['id'])
 
-        if 'start_row' in kwargs:
-            start_row = kwargs['start_row']
-        else:
-            start_row = 0
-
-        if 'num_rows' in kwargs:
-            num_rows = kwargs['num_rows']
-        else:
-            num_rows = 100
-
-        _logger.debug('Going to fetch %s transaction for account %s starting at %s' % (
-            num_rows, account['id'], start_row))
-        _logger.debug('Account : {}'.format(account))
-
-        payload = {
-            'actionName' : 'com.linxo.gwt.rpc.client.pfm.GetTransactionsAction',
-            'action' : {
-                'accountId' : account['id'],
-                'labels' : [],
-                'categoryId' : None,
-                'tagId' : None,
-                'startRow' : start_row,
-                'numRows' : num_rows,
-            }
-        }
-
-        return self._perform_query(payload)
-
-    def _login(self):
-        """Perform authentification on linxo, using secureData extracted data
-        """
-        payload = {
-            'actionName' : 'com.linxo.gwt.rpc.client.auth.LoginAction',
-            'action' : {
-                'email'    : self.username,
-                'password' : self.password,
-            },
-        }
-
-        self._perform_query(payload)
-        self.logged_in = True
-
-    def _logout(self):
-        """Perform logout, called by __del__
-        """
-        payload = { 
-            'actionName' : 'com.linxo.gwt.rpc.client.auth.LogoutAction' }
-        self._perform_query(payload)
-
-    def _set_cookies(self):
-        """Fetch cookies from auth page
-        """
-        auth_page = 'https://%s/auth.page' % self.base_domain
-        self.session.get(auth_page, verify=self.verify_ssl)
-
-
-    def _get_hash(self):
-        """Low level function that generate hash needed for linxo security
-        """
-
-        import time
-        import base64
-        import hashlib
-        timestamp = int(time.time())
-        sha1 = hashlib.sha1("%s%s%s" % (self.nonce, timestamp, self.api_secret))
-        signature = base64.b64encode(sha1.hexdigest())
-
-        return {
-            'nonce'     : self.nonce,
-            'timeStamp' : timestamp,
-            'apiKey'    : self.api_key,
-            'signature' : signature
-        }
-
-
-
-    def _perform_query(self, payload):
-        """Low level function that does the get action on linxo
-        """
-
-        # No action in payload yell
-        if 'actionName' not in payload:
-            raise Exception('Missing key actionName is payload')
-
-        # If no hash, add it
-        if 'hash' not in payload:
-            payload['hash'] = self._get_hash()
-
-        # If no secret, add it
-        if 'action' not in payload:
-            payload['action'] = {}
-
-        if 'secret' not in payload['action']:
-            payload['action']['secret'] = self.session.cookies['LinxoSession']
-
-        result = self.session.post(self.url, 
-                                   data=json.dumps(payload), 
-                                   verify=self.verify_ssl)
-
-        # Now r.text should contain )]}'\n , remove that and jsonize
-        raw_json = re.compile('\)\]\}\'\n').sub('', result.text)
-
-        # Result are check according to functions called
-        json_response = json.loads(raw_json)
-
-        if payload['actionName'] == 'com.linxo.gwt.rpc.client.auth.LoginAction':
-            # Special treatment for login:
-            if 'result' not in json_response:
-                raise osv.except_osv(_("Error!"), _("Weird loggin error ..."))
-            elif 'userId' not in json_response['result']:
-                blocked = json_response['result']['blocked']
-                if blocked:
-                    raise osv.except_osv(_("Error!"), _("Too much login tentative, you are now blocked."))
-                else:
-                    raise osv.except_osv(_("Warning"), _("Unable to login : wrong credentials."))
-        elif json_response['resultName'] == 'com.linxo.gwt.server.support.json.ErrorResult':
-            raise APIError(json_response['result'])
-
-        return json_response['result']
-
-
-    def __del__(self):
-        if self.logged_in:
-            self._logout()
-        super(self.__class__, self).__del__() 
-
+                # Do we have a linxo.transaction with that id ?
+                transaction_obj = self.pool.get('linxo.transaction')
+                transaction_ids = transaction_obj.search(cr, uid, [('linxo_id', '=', lowest_id)], context=context)
+                if transaction_ids:
+                    stop = True
+        return transactions
 
 linxo_sync()
     
@@ -568,39 +395,31 @@ class linxo_config_settings(osv.osv_memory):
     _name = 'linxo.config.settings'
     _inherit = 'res.config.settings'
     _columns = {
-        'username': fields.char('Username (email address)', size=48),
-        'password': fields.char('Password', size=48),
-        'api_key': fields.char('Linxo API Key', size=48),
-        'api_secret': fields.char('Linxo API Secret', size=60),
+        'client_id': fields.char('API client_id', size=48),
+        'client_secret': fields.char('API client_secret', size=48),
+        'refresh_token': fields.char('API refresh_token', size=48),
     }
 
-    def get_default_username(self, cr, uid, ids, context=None):
+    def get_default_client_id(self, cr, uid, ids, context=None):
         """Get default value if already defined"""
-        return self._get_default(cr, uid, ids, context, 'username')
+        return self._get_default(cr, uid, ids, context, 'client_id')
 
-    def set_default_username(self, cr, uid, ids, context=None):
-        return self._set_default(cr, uid, ids, context, 'username')
+    def set_default_client_id(self, cr, uid, ids, context=None):
+        return self._set_default(cr, uid, ids, context, 'client_id')
 
-    def get_default_password(self, cr, uid, ids, context=None):
+    def get_default_client_secret(self, cr, uid, ids, context=None):
         """Get default value if already defined"""
-        return self._get_default(cr, uid, ids, context, 'password')
+        return self._get_default(cr, uid, ids, context, 'client_secret')
 
-    def set_default_password(self, cr, uid, ids, context=None):
-        return self._set_default(cr, uid, ids, context, 'password')
+    def set_default_client_secret(self, cr, uid, ids, context=None):
+        return self._set_default(cr, uid, ids, context, 'client_secret')
 
-    def get_default_api_key(self, cr, uid, ids, context=None):
+    def get_default_refresh_token(self, cr, uid, ids, context=None):
         """Get default value if already defined"""
-        return self._get_default(cr, uid, ids, context, 'api_key')
+        return self._get_default(cr, uid, ids, context, 'refresh_token')
 
-    def set_default_api_key(self, cr, uid, ids, context=None):
-        return self._set_default(cr, uid, ids, context, 'api_key')
-
-    def get_default_api_secret(self, cr, uid, ids, context=None):
-        """Get default value if already defined"""
-        return self._get_default(cr, uid, ids, context, 'api_secret')
-
-    def set_default_api_secret(self, cr, uid, ids, context=None):
-        return self._set_default(cr, uid, ids, context, 'api_secret')
+    def set_default_refresh_token(self, cr, uid, ids, context=None):
+        return self._set_default(cr, uid, ids, context, 'refresh_token')
 
     def _get_default(self, cr, uid, ids, context, param_name):
         """Get default value if already defined"""
@@ -609,7 +428,7 @@ class linxo_config_settings(osv.osv_memory):
         return { param_name: value }
 
     def _set_default(self, cr, uid, ids, context, param_name):
-        """Set default username to use with linxo API"""
+        """Set default client_id to use with linxo API"""
         if uid != SUPERUSER_ID and not self.pool['res.users'].has_group(cr, uid, 'base.group_erp_manager'):
             raise openerp.exceptions.AccessError(_("Only administrators can change the settings"))
         config = self.browse(cr, uid, ids[0], context)
@@ -627,7 +446,6 @@ class linxo_account(osv.osv):
         'name': fields.char('Account Name', size=120, required=True),
         'linxo_id' : fields.integer('Linxo Account ID', required=True),
         'journal_id': fields.many2one('account.journal', 'Bank Journal', ondelete='cascade'),
-        'account_group_name': fields.char('Account Group Name', size=30, required=True),
         'account_number': fields.char('Account Number', size=30, required=True),
         'type': fields.char('Account Type', size=30, required=True),
     }
@@ -649,18 +467,11 @@ class linxo_transaction(osv.osv):
             'linxo.account', 'Linxo Account', ondelete='cascade'),
         'account_move_line_id': fields.many2one(
             'account.move.line', 'Account Move Line'),
-        #'invoice_id': fields.many2one(
-        #    'account.invoice', 'Invoice'),
         'amount': fields.float('Amount', digits_compute=dp.get_precision('Account'), required=True),
-        'budget_date': fields.date('Budget Date', required=True),
         'date': fields.date('Date', required=True),
-        'category' : fields.integer('Category'),
         'reconciled': fields.boolean('Reconciled'),
         'label': fields.char('Label', size=255, required=True),
-        'notes': fields.char('Notes', size=255, required=True),
-        'city' : fields.char('City', size=255),
-        'original_label': fields.char('Original Label', size=255),
-        'original_third_party': fields.char('Original Third Party', size=255),
+        'notes': fields.char('Notes', size=255),
         'journal_id': fields.related(
             'account_id', 'journal_id', type="many2one",
             relation="account.journal", string="Bank Journal",

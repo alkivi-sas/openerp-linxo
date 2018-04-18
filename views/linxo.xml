@@ -10,7 +10,6 @@
                     <field name="name" string="Account Name"/>
                     <field name="account_number" string="Account Number"/>
                     <field name="journal_id" invisible="True" />
-                    <field name="account_group_name" string="Account Group Name"/>
                 </search>
             </field>
         </record>
@@ -23,7 +22,6 @@
             <field name="arch" type="xml">
                 <tree string="Linxo Bank Accounts" colors="darkred:journal_id=='False'" editable="bottom">
                     <field name="name" readonly="1" />
-                    <field name="account_group_name" readonly="1" />
                     <field name="linxo_id" invisible="True" />
                     <field name="journal_id" />
                     <field name="account_number" readonly="1" />

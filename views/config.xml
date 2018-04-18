@@ -13,10 +13,9 @@
                     </header>
                     <separator string="Global Linxo Settings"/>
                     <group colspan="2" col="2">
-                        <field name="username" />
-                        <field name="password" password="True"/>
-                        <field name="api_key" />
-                        <field name="api_secret" password="True"/>
+                        <field name="client_id" />
+                        <field name="client_secret" />
+                        <field name="refresh_token" />
                     </group>
                 </form>
             </field>
