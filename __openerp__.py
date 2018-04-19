@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 { 
    'name': 'Linxo', 
-   'version': '1.1.3', 
+   'version': '2.0.0', 
    'summary': 'Bank reconciliation using Linxo',
    'description': """
 Import bank statement from Linxo and perform automatic reconciliation.
@@ -22,8 +22,6 @@ guess failed.""",
    'data': [ 
        'security/ir.model.access.csv',
        'views/linxo.xml',
-       'views/config.xml',
    ], 
-   'installable': True,
-   'application': True,
+   'aapplication': True,
 } 
