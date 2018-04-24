@@ -221,7 +221,7 @@ class linxo_sync(models.TransientModel):
             transaction_values = _get_values(local_account)
             tr_id = transaction_obj.create(transaction_values)
             _logger.debug('created new transaction %d' % tr_id)
-            transaction_obj.browse(tr_id).search_reconciliation()
+            tr_id.search_reconciliation()
             return 1
 
     def _handle_bank_account(self, account):
@@ -244,7 +244,7 @@ i
             """Link between our object name and linxo object
             """
             if data is None:
-                return {'account_number': 'accountNumber',
+                return {'account_number': 'account_number',
                         'name': 'name',
                         'type': 'type'}
             elif data is 'int':
