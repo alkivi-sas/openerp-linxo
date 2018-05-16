@@ -40,9 +40,9 @@ class account_move_line(models.Model):
             search_args = [('account_move_line_id', '=', record.id), ('reconciled', '=', False)]
             test_ids = move_obj.search(search_args)
             if test_ids:
-                self.unreconciled = False
+                record.unreconciled = False
             else:
-                self.unreconciled = True
+                record.unreconciled = True
 
     unreconciled = fields.Boolean(compute=_get_unreconciled,
                                   search=_search_reconciled)
