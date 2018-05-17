@@ -207,6 +207,8 @@
                         <field name="debit" readonly="1" />
                         <field name="credit" readonly="1" />
                         <field name="transaction_id" readonly="1" />
+                        <field name="label" string="Label" readonly="1" />
+                        <field name="notes" string="Notes" readonly="1" />
                     </group>
                     <separator string="Matching Account Move Line" colspan="4"/>
                     <field name='candidates' context="{'transaction_id': transaction_id}">
@@ -226,6 +228,7 @@
                             <field name="amount_total" readonly="1" />
                             <field name="state" readonly="1" />
                             <field name="number" readonly="1" />
+                            <field name="supplier_invoice_number" readonly="1" />
                             <field name="partner_id" readonly="1" />
                             <button string="I'm the correct one" type="object" name="do_reconciliation" icon="STOCK_EXECUTE"/>
                         </tree>

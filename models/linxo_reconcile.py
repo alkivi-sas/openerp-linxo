@@ -116,3 +116,5 @@ class linxo_reconcile(models.TransientModel):
     transactions = fields.One2many('linxo.transaction',
                                    compute=_get_transactions,
                                    string='Matching Reverse Transactions')
+    label = fields.Char('Label', related='transaction_id.label')
+    notes = fields.Char('Notes', related='transaction_id.notes')
